@@ -4,6 +4,7 @@
 = Introduction =
 
 Screenshots of jsVNC accessing a WinXP machine in windowed and fullscreen mode.
+
 The client machine resolution is 1280x800 the XP Machine is 800x600.
 
 = Windowed mode with pinned panel and non-scaled desktop =
