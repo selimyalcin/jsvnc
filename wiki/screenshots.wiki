@@ -4,19 +4,20 @@
 = Introduction =
 
 Screenshots of jsVNC accessing a WinXP machine in windowed and fullscreen mode.
+The client machine resolution is 1280x800 the XP Machine is 800x600.
 
 = Windowed mode with pinned panel and non-scaled desktop =
 
-[http://jsvnc.googlecode.com/svn/trunk/screenshots/windowed.png]
+<img src="http://jsvnc.googlecode.com/svn/trunk/screenshots/windowed.png" width="800" />
 
 = Fullscreen mode with pinned panel and non-scaled desktop =
 
-[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_unscaled_pinned.png]
+<img src="http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_unscaled_pinned.png" width="800" />
 
 = Fullscreen mode with unpinned panel and non-scaled desktop =
 
-[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_unscaled_unpinned.png]
+<img src="http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_nonscaled_unpinned.png" width="800" />
 
 = Fullscreen mode with unpinned panel and scaled desktop =
 
-[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_scaled_unpinned.png]
+<img src="http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_scaled_unpinned.png" width="800" />
