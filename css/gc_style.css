@@ -1,0 +1,97 @@
+body {
+  padding: 0;
+  margin: 0;
+  
+  text-align: center;
+}
+
+body div {
+  padding: 0;
+  font-family: Serif, Times, Verdana, Helvetica;
+}
+
+input.host {
+  width: 220px;
+}
+
+input.port {
+  width: 50px;
+}
+
+.info {
+  background-color: #DBEDBD;
+  padding: 5px;
+}
+
+.stuff {
+  text-align: left;
+}
+.panel {
+  text-align: left;
+  width: auto;
+
+  padding: 10px 5px;  
+  background-color: #26a4dc;
+}
+
+.panel div { display: inline; }
+
+.btn {
+  width: 75px;
+  
+  border: 1px solid;
+  border-color: #8aceed #47b3e2 #47b3e2 #8aceed;
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  
+  background-color: #49b3e2;
+  background-position: 5px 50%;
+  
+  padding: 5px 10px;
+  cursor: pointer;
+  
+  font-size: 11px;
+  font-weight: bold;
+  
+  font-family: verdana;
+  text-transform: uppercase;
+  color: white;
+}
+
+.btn:hover {
+  border-color: #f2fafd #aedef3 #aedef3 #f2fafd;
+  background-color: #8cceec;
+}
+
+.info {
+  width: 100px;
+  border: 1px solid black;
+
+  background-position: 5px 50%;
+
+  font-size: 13px;
+  font-weight: bold;
+  padding: 5px 10px;
+}
+
+.icon {
+  background-image: url(../images/icons/bullet_black.png);
+  background-repeat: no-repeat;
+  padding-left: 24px;
+}
+
+.refresh { background-image: url(../images/icons/arrow_refresh.png); }
+.scale { background-image: url(../images/icons/arrow_inout.png); }
+.fullscreen { background-image: url(../images/icons/arrow_out.png); }
+
+.machine { background-image: url(../images/icons/server.png); }
+.connect { background-image: url(../images/icons/bullet_black.png); }
+.disconnect { background-image: url(../images/icons/cross.png); }
+
+.connected { background-image: url(../images/icons/connect.png); }
+.disconnected { background-image: url(../images/icons/disconnect.png); }
+.unknown { background-image: url(../images/icons/disconnect.png); }
+
+#host_information div { display: block; }
+#host_information div > div { display: block; }
+#log { width: 1024px; overflow: scroll; }

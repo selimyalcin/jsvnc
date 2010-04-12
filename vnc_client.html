@@ -1,0 +1,464 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+<title>jsVNC</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" /> 
+<script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/jquery.base64.js"></script>
+<script type="text/javascript" src="js/base64.js"></script>
+<script type="text/javascript" src="js/socket.js"></script>
+<script type="text/javascript" src="js/rfb.js"></script>
+<link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
+</head>
+<body>
+
+<div id="frame_container">
+
+  <div id="panel" class="panel">
+    <div id="pin"     class="btn icon pin"      title="Controls whether the panel should be visible.">Pin</div>
+    <div id="refresh" class="btn icon refresh"  title="Request a full display update.">Refresh</div>
+    <div id="scale"   class="btn icon scale"    title="Scale the display to fit in the current window.">Scale</div>
+    
+    <div id="con_status" class="info icon">
+      
+      <fieldset>
+      
+      <table>
+        <tr><td>Bytes sent/recv</td><td><span id="bytes_sent">0</span>/<span id="bytes_recv">0</span></td></tr>
+        <tr><td>Messages sent/recv</td><td><span id="msg_sent">0</span>/<span id="msg_recv">0</span></td></tr>
+      </table>
+      </fieldset>
+      
+      <span>Unknown</span>
+  
+    </div>
+    <div id="host_status" class="info icon machine">
+      
+      <fieldset>
+        
+        <table>
+          <tr><td>Hostname</td><td><span    id="hostname">Unknown</span></td></tr>
+          <tr><td>Resolution</td><td><span  id="fb_res">0x0x0</span></td></tr>
+          <tr><td>Color Depth</td><td><span id="fb_depth">Unknown</span></td></tr>
+          <tr><td>Big Endian</td><td><span  id="fb_endian">Unknown</span></td></tr>
+          <tr><td>True Color</td><td><span  id="fb_truecolor">Unknown</span></td></tr>
+          <tr><td>RGB Max:</td><td>(<span   id="fb_rgbmax">,,</span>)</td></tr>
+          <tr><td>RGB Shift:</td><td>(<span id="fb_rgbshift">,,</span>)</td></tr>
+        </table>  
+      </fieldset>
+      
+      <span>Unknown</span>
+    </div>
+  
+    <div class="info icon log">  
+      <fieldset>    
+      <div id="log"></div>
+      </fieldset>
+      
+      <span>Log</span>
+    </div>
+    &nbsp;  
+    <div id="disconnect"  title="Close the current connection."   class="btn icon disconnect" >Disconnect</div>
+      
+    <div class="info">
+      
+      <fieldset>
+      
+        <table>
+          <tr>
+            <td>VNC Host/Port</td>
+            <td><input id="vnc_host" class="host" type="text" name="vnc_host" value="255.255.255.255" />
+              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900" />
+            </td>
+          </tr>
+          <tr>
+            <td>WS Host/Port</td>
+            <td><input id="ws_host" class="host" type="text" name="ws_host" value="wstest.local" />
+               / <input id="ws_port" type="text" class="port" name="ws_port" value="5555" />
+            </td>
+          </tr>
+          <tr><td colspan="2"><div id="connect" class="btn icon connect">Connect</div></td></tr>
+        </table>
+      
+      </fieldset>
+      
+      <span>Reconnect</span>
+      
+    </div>
+  </div>
+
+</div>
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+  
+  if ("WebSocket" in window) {
+    
+    // Framebuffer dimensions and specifications
+    var fb = {width:0,        height:0,       bpp:0,
+              depth:0,        big_endian: 0,  true_color: 0,
+              red_max:    0,  green_max: 0,   blue_max: 0,
+              red_shift:  0,  green_shift: 0, blue_shift: 0,
+              name: '', scaled: 0};
+    
+    // Communication statistics
+    var stats = { bytes_sent: 0,  bytes_recv: 0,
+                  msg_sent:0,     msg_recv:0 };
+    
+    // Host addresses
+    var hosts = { vnc_host: $('#vnc_host').val(),
+                  vnc_port: $('#vnc_port').val(),
+                  ws_host:  $('#ws_host').val(),
+                  ws_port:  $('#ws_port').val() };
+    
+    // Display canvas-context
+    var ctx; // Initialized during handshake
+    
+    // Communication channel
+    var ws = new WebSocket('ws://'+hosts.ws_host+':'+hosts.ws_port+'/vnc');
+    
+    var offset = 16;
+    var state =0;
+    var handshake_state = 0;
+    var row = 0;
+    var col = 0;
+    var pixels_read = 0;
+    
+    var cut_text = '';    
+    var msg_type = -1;
+    
+    var buffer = '';
+    var rectangle_buffer = '';
+    var cursor = 0;
+    
+    var pinned = 0;
+    
+    function blink() { $('#spinner').addClass('bullet_green'); setTimeout(unblink, 0.01); }
+    function unblink() { $('#spinner').removeClass('bullet_green').addClass('bullet_blue'); }
+    
+    function init_framebuffer(width, height) {
+      
+      // Handling the mouse
+      $('#framebuffer').click(function (event) {
+  
+        // Grab cursor "desktop-coordinates"
+        var offset = $(this).offset()
+        var cursor_x, cursor_y = 0;
+        cursor_x = event.pageX - offset.left;
+        cursor_y = event.pageY - offset.top;
+        
+        $('#log').append('['+cursor_x+','+cursor_y+']'); // Find out about js-debug!
+  
+        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 1) ));
+        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 0) ));
+  
+      });
+      
+      var context = document.getElementById('framebuffer').getContext('2d');
+      context.fillStyle = 'rgb(200,50,50)';
+      context.fillRect(0, 0, fb.width, fb.height);
+      
+      return context;      
+      
+    } 
+    
+    // Received a message from the websocket
+    ws.onmessage = function (evt) {
+      
+      var received_msg = $.base64Decode( evt.data );
+      var name = '';
+      var log = ''
+            
+      stats.msg_recv   += 1;
+      stats.bytes_recv += received_msg.length;
+            
+      // Debug logging of incoming messages
+      log += '[<label style="color: red">'+received_msg.length;      
+      if (received_msg.length < 40) {
+        log += ': '+received_msg;
+      }
+      log += '</label>]&nbsp;';
+      $('#log').append(log);
+
+      $('#bytes_recv').html(stats.bytes_recv);
+      $('#msg_recv').html(stats.msg_recv);
+
+      // Send rfb version
+      if (handshake_state == 0) {
+        handshake_state += 1;
+        ws.send( $.base64Encode('RFB 003.008\n') );
+      
+      // Select security type
+      } else if (handshake_state == 1) {
+        handshake_state += 1;
+        ws.send( $.base64Encode( num_to_u8(1)) );
+        
+      // Receive handshake status, send client-init (shared-flag)
+      } else if (handshake_state == 2) {
+        handshake_state += 1;
+        ws.send( $.base64Encode( num_to_u8(0) ));
+        
+      // Receive server-init
+      } else if (handshake_state == 3) {
+        
+        handshake_state += 1;
+        
+        fb.width  = u16_to_num(received_msg[0], received_msg[1]);
+        fb.height = u16_to_num(received_msg[2], received_msg[3]);
+        
+        fb.bpp          = u8_to_num(received_msg[4]);
+        fb.depth        = u8_to_num(received_msg[5]);
+        fb.big_endian   = u8_to_num(received_msg[6]);
+        fb.true_color   = u8_to_num(received_msg[7]);
+        fb.red_max      = u16_to_num(received_msg[8], received_msg[9]);
+        fb.green_max    = u16_to_num(received_msg[10], received_msg[11]);
+        fb.blue_max     = u16_to_num(received_msg[12], received_msg[13]);
+        fb.red_shift    = u8_to_num(received_msg[14]);
+        fb.green_shift  = u8_to_num(received_msg[15]);
+        fb.blue_shift   = u8_to_num(received_msg[16]);
+        
+        // Three bytes of padding 17-19
+        
+        // Add the context
+        $('#frame_container').append('<canvas id="framebuffer" width="'+fb.width+'" height="'+fb.height+'"></canvas>');        
+        ctx = init_framebuffer(fb.width, fb.height);
+        
+        // Length of the name
+        name_length = u32_to_num(received_msg[20],received_msg[21],received_msg[22],received_msg[23]);
+        
+        // Throw it to gui
+        $('#fb_res').html(fb.width+'x'+fb.height+'x'+fb.bpp);
+        $('#fb_depth').html(fb.depth);
+        $('#fb_endian').html(fb.big_endian);
+        $('#fb_truecolor').html(fb.true_color);
+        $('#fb_rgbmax').html(fb.red_max+','+fb.green_max+','+fb.blue_max);
+        $('#fb_rgbshift').html(fb.red_shift+','+fb.green_shift+','+fb.blue_shift);        
+              
+      // Get the hostname of the vnc server
+      } else if (handshake_state == 4) {
+        
+        handshake_state += 1;
+        $('#hostname').html(received_msg);
+        ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
+
+      // Start handling messages from servers
+      } else {
+        
+        // Find out what the server is sending us
+        if (msg_type == -1) {          
+          msg_type  = u8_to_num(received_msg[0]);
+          $('#log').append('[MSG_TYPE='+msg_type+']')
+        }
+        
+        // Handle what the server is sending us
+        
+        // 6.5.1 FramebufferUpdate
+        if (msg_type == 0) {
+                    
+          buffer += received_msg;
+          
+          // Number of rectangles
+          // Padding = 1 byte
+          var num_r = u16_to_num(buffer[2], buffer[3]);          
+          var rectangle = {
+            x_pos:  u16_to_num(buffer[4], buffer[5]),
+            y_pos:  u16_to_num(buffer[6], buffer[7]),
+            rect_w: u16_to_num(buffer[8], buffer[9]),
+            rect_h: u16_to_num(buffer[10], buffer[11]),
+            rect_encoding: u32_to_num(buffer[12], buffer[13], buffer[14], buffer[15])
+          };
+          
+          for(i=offset; i<buffer.length; i=i+4) {
+            
+            pixels_read += 1;
+            
+            // Raw-encoding pixelcolor order: blue, green, red, alpha
+            // We do not use the alpha channel...
+            b = u8_to_num(buffer[i]);
+            g = u8_to_num(buffer[i+1]);
+            r = u8_to_num(buffer[i+2]);
+  
+            // Draw the pixel
+            ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+            ctx.fillRect(col, row, 1, 1);
+            
+            // Fix this!
+            if ((pixels_read % (fb.width)) == 0) {
+              row +=1;
+              col = 0;
+            } else {
+              col += 1;
+            }
+            
+            if (row > fb.height) {
+              row = 0;
+            }
+            
+          }
+          offset = buffer.length;
+          var rectangle_length = fb.width * fb.height *(fb.bpp/8);
+          
+          if (buffer.length == rectangle_length+16) {
+            msg_type = -1;
+            buffer = '';
+            col = 0;
+            row = 0;
+            offset = 16;
+            $('#log').append('DONE READING RECTANGLE!');
+          }
+        
+        // 6.5.2 SetColourMapEntries
+        // When the pixel format uses a “colour map”, this message tells the
+        // client that the specified pixel values should be mapped to the given
+        // RGB intensities.
+        //
+        $('#log').append('[Buffer length: '+ buffer.length+']')
+        } else if (msg_type == 1) {
+          
+          msg_type = -1;
+          
+        // 6.5.3 Bell
+        // Ring a bell on the client if it has one.
+        // 1      u8        2   message-type
+        //
+        } else if (msg_type == 2) {
+          msg_type = -1;
+          
+        // 6.5.4 ServerCutText
+        // The server has new ISO 8859-1 (Latin-1) text in its cut buffer.
+        // 1      u8        3   message-type
+        // 3      _         _   padding
+        // 4      u32       _   length
+        // length u8 array  _   text
+        //
+        } else if (msg_type == 3) {
+                    
+          buffer += received_msg;
+          var text_length = u32_to_num(received_msg[4],received_msg[5],received_msg[6],received_msg[7]);
+          cut_text = '';
+          
+          for(var i=8; i<buffer.length; i++) {
+            cut_text += buffer[i];
+          }
+          
+          $('#log').append('[ServerCutText: '+text_length+' '+ cut_text+']')
+          if (buffer.length == (8+text_length)) {
+            buffer = '';
+            msg_type = -1;
+          }
+        }
+        
+      }
+  
+    };
+    
+    // WebSocket is connected. You can send data by send() method.    
+    ws.onopen = function() {
+      $('#con_status > span').html('Connected');
+      $('#con_status').removeClass('disconnected').addClass('connected');
+    };
+    
+    // WebSocket is disconnected.
+    ws.onclose = function() {
+      $('#con_status').html('Disconnected');
+      $('#con_status').removeClass('connected').addClass('disconnected');
+    };
+    
+    // Pin click
+    $('#pin').click(function (event) {
+      
+      pinned = pinned^1;
+      
+      $('#log').append('['+$(window).width()+','+$(window).height()+']');
+      $('#log').append('['+$(document).width()+','+$(document).height()+']');
+      
+      if ($('#panel').hasClass('unpinned')) {
+        $('#panel').removeClass('unpinned');
+        $('#panel').removeClass('hidden');
+        $('#pin').removeClass('unpin').addClass('pin');
+      } else {
+        $('#panel').addClass('unpinned');
+        $('#panel').addClass('hidden');
+        $('#pin').removeClass('pin').addClass('unpin');
+      }
+      
+    });
+    
+    // Refresh click
+    $('#refresh').click(function (event) {      
+      ws.send($.base64Encode( fbur(fb.width, fb.height )));
+    });
+    
+    // Scale click
+    $('#scale').click(function () {
+            
+      var w = 0;
+      var h = 0;
+      
+      // Toggle scaling
+      fb.scaled = fb.scaled^1;
+      
+      // Determine width and height
+      if (fb.scaled == 1) {
+        w = $(window).width();      
+        h = $(window).height();
+      } else {
+        w = fb.width;
+        h = fb.height
+      }
+      
+      // Do scaling
+      $('#frame_container canvas').width(w);
+      $('#frame_container canvas').height(h);
+      
+    });
+    
+    // Disconnect click
+    $('#disconnect').click(function () {
+      ws.close();
+    });
+    
+    // Input listener
+    $(document).keydown(function (event) {
+      
+      //alert('something happened');
+      $('#log').append('[KeyDown: '+event.which+']');
+      
+    });
+    
+    // Input listener
+    $(document).keyup(function (event) {
+      //
+      ////alert('something happened');
+      //$('#log').append('[KeyUp: '+event.which+']');
+      //ws.send( keyEvent( 112, 1) );
+      //ws.send( keyEvent( 112, 0) );
+      ////ws.send( keyEvent( event.which, 1) );
+      ////ws.send( keyEvent( event.which, 0) );
+      //
+      //$('#log').append('[wtf?: '+keyEvent( event.which, 1)+']');
+      
+      
+    });
+    
+    // Input listener
+    // TODO: shortcut handling here
+    $(document).keypress(function (event) {
+      
+      $('#log').append('[KeyPress: '+event.which+']');
+      
+    });
+  
+  // The browser do not support WebSocket.
+  } else {
+    alert('Sucks! No support for the new great shit!');  
+  }  
+  
+});
+
+</script>
+
+</body>
+</html>
+
