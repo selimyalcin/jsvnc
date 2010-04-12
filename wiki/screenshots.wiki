@@ -7,10 +7,16 @@ Screenshots of jsVNC accessing a WinXP machine in windowed and fullscreen mode.
 
 = Windowed mode with pinned panel and non-scaled desktop =
 
+[http://jsvnc.googlecode.com/svn/trunk/screenshots/windowed.png]
+
 = Fullscreen mode with pinned panel and non-scaled desktop =
+
+[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_unscaled_pinned.png]
 
 = Fullscreen mode with unpinned panel and non-scaled desktop =
 
+[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_unscaled_unpinned.png]
+
 = Fullscreen mode with unpinned panel and scaled desktop =
 
-
+[http://jsvnc.googlecode.com/svn/trunk/screenshots/fullscreen_scaled_unpinned.png]
