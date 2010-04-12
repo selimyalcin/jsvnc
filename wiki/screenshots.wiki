@@ -1,0 +1,13 @@
+#summary Screenshots of jsVNC in action.
+#labels screenshots,usage
+
+= Introduction =
+
+Screenshots of jsVNC accessing a WinXP machine in windowed and fullscreen mode.
+
+= Details =
+
+Add your content here.  Format your content with:
+  * Text in *bold* or _italic_
+  * Headings, paragraphs, and lists
+  * Automatic links to other wiki pages
