@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+<title>Websocket Echo-Client</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8"> 
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="marshall.js"></script>
+<style type="text/css">
+input {
+  display: inline;
+}
+
+.panel div {
+  display: inline;
+}
+</style>
+</head>
+<body>
+
+<div id="blob"></div>
+
+<hr />
+<div class="panel">
+  <input id="ws_host" type="text" name="ws_host" value="wstest.local" />
+  <input id="ws_port" type="text" name="ws_port" value="5555" />
+  <div id="connect">Connect</div>
+</div>
+
+<div class="panel">
+  <input id="some_data" type="text" name="some_data" /> <div id="send_msg">Send</div>
+</div>
+
+<table>
+  <tr>
+    <td>Connection Status</td><td><div id="con_status">Unknown</div></td>
+  </tr>
+  <tr>
+    <td>Incoming messagecount</td><td><div id="msg_count"></div></td>
+  </tr>  
+</table>
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+  
+  if ("WebSocket" in window) {
+    
+    function echo_client() {
+      
+      var i_count = 0;
+      var ws_host = $('#ws_host').val();
+      var ws_port = $('#ws_port').val();
+      
+      var ws = new WebSocket('ws://'+ws_host+':'+ws_port+'/vnc');
+      
+      // WebSocket is connected. You can send data by send() method.    
+      ws.onopen = function() {
+        $('#con_status').html('Connected');
+      };
+      
+      // WebSocket is disconnected.
+      ws.onclose = function() {
+        $('#con_status').html('Disconnected');
+      };
+      
+      // Received a message
+      ws.onmessage = function (evt) {
+        
+        var received_msg = decode64(evt.data);
+        i_count = i_count + 1;
+        $('#blob').append(received_msg.charCodeAt(0));
+        $('#msg_count').html(i_count);
+    
+      };
+      
+      $('#send_msg').click(function () {
+        ws.send(byte2_u('50'));
+        //ws.send(byte_u($('#some_data').val()));
+        //ws.send(byte2_u($('#some_data').val()));
+        //ws.send(byte4_u($('#some_data').val()));
+        //
+        //ws.send(byte_s($('#some_data').val()));
+        //ws.send(byte2_s($('#some_data').val()));
+        //ws.send(byte4_s($('#some_data').val()));
+      });
+
+    }
+    
+    $('#connect').click(echo_client);
+  
+  // The browser do not support WebSocket.
+  } else {
+    alert('Sucks! No support for the new great shit!');  
+  }  
+  
+});
+
+</script>
+
+</body>
+</html>
