@@ -5,9 +5,12 @@
 
 Screenshots of jsVNC accessing a WinXP machine in windowed and fullscreen mode.
 
-= Details =
+= Windowed mode with pinned panel and non-scaled desktop =
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+= Fullscreen mode with pinned panel and non-scaled desktop =
+
+= Fullscreen mode with unpinned panel and non-scaled desktop =
+
+= Fullscreen mode with unpinned panel and scaled desktop =
+
+
