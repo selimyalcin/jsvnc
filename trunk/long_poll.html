@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+<title>Long-Poll Echo-Client</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8"> 
+<script type="text/javascript" src="js/jquery.js"></script>
+</head>
+<body>
+
+<div id="chunked">Chunked</div>
+<div id="bosh">BoshStyle</div>
+<div id="ajax">Ajax</div>
+<div id="longpoll">LongPoll</div>
+
+<div id="messages" style="width: 400px; height: 300px; background-color: blue;"></div>
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+
+    $('#chunked').click(
+        function () {
+
+            var xhr = new window.XMLHttpRequest();
+            xhr.open('GET', 'http://10.10.20.20:8080/chunked');    
+            xhr.onreadystatechange = function(event) {
+                
+                $('#messages').append('['+JSON.stringify(xhr.readyState)+','+xhr.responseText+','+xhr.status+','+xhr.statusText+']<br />');
+                
+            }
+            xhr.send('hello');
+        }
+    );
+
+    $('#longpoll').click(
+        function () {
+
+            var xhr = new window.XMLHttpRequest();
+            xhr.open('GET', 'http://10.10.20.20:8080/test');    
+            xhr.onreadystatechange = function(event) {
+                
+                $('#messages').append('['+JSON.stringify(xhr.readyState)+','+xhr.responseText+','+xhr.status+','+xhr.statusText+']<br />');
+                
+            }
+            xhr.send('hello');
+        }
+    );
+        
+    $('#ajax').click(
+        
+        function () {
+            $.ajax({
+                url: "http://wstest.local:8080/test",
+                type: "GET",
+                dataType: "text",
+                cache: false,
+                success: function(msg, textStatus, XMLHttpRequest){
+                    
+                    $('#messages').append(textStatus+'['+msg+']');
+                }
+            });
+        }   
+    );
+    
+    
+    $('#bosh').click( function () {
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://10.10.20.20:8080/test');    
+        xhr.onreadystatechange = function(event) {
+            
+            $('#messages').append('['+JSON.stringify(xhr.readyState)+','+xhr.responseText+','+xhr.status+','+xhr.statusText+']<br />');
+            
+            // Do it again
+            if (xhr.readyState == 4) {
+                xhr.open('GET', 'http://10.10.20.20:8080/test');
+                xhr.send('hello');
+            }
+            
+        }
+        xhr.send('hello');        
+    } );
+    
+});
+
+</script>
+
+</body>
+</html>
