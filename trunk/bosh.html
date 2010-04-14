@@ -13,12 +13,13 @@
   
   <div id="bosh_connect" class="btn icon">Connect</div>
   <div id="bosh_disconnect" class="btn icon">Disconnect</div>  
-  <input id="bosh_message" type="text" value="echo this" /> <div id="bosh_send" class="btn icon">Send Message</div>
+  <input id="bosh_message" type="text" value="{{{smallstufff}}}" /> <div id="bosh_send" class="btn icon">Send Message</div>
   
 </div>
-
+<canvas>You do not support HTML5 canvas!</canvas>
 <p>&nbsp;</p><p>&nbsp;</p>
 <div id="messages" style="width: 400px; height: 300px; background-color: blue;"></div>
+
 
 <script type="text/javascript">
   
@@ -36,15 +37,25 @@ $(document).ready(function(){
   
   $('#bosh_send').click( function () {
     
-    //var big = $('#big_data').val();
     var big = $('#big_data').val();
     var small = $('#bosh_message').val();
-    for(var i=0;i<10;i++) {
-      //Hobs.send(small);
-      //Hobs.send(big);
-      Hobs.send(big);
+    for(var i=0;i<10;i++) {      
+      Hobs.send('['+i+','+small+']');
+      Hobs.send('['+i+','+big+']');
     }
   });
+  
+  Hobs.onopen = function (data) {
+    $('#messages').append('[Connection is open!]');
+  }
+  
+  Hobs.onclose = function (data) {
+    $('#messages').append('[Connection is closing!]');
+  }
+  
+  Hobs.onmessage = function (data) {
+    $('#messages').append('[Got stuff'+data+']');
+  }
 
 });
 
