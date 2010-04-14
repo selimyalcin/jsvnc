@@ -1,0 +1,10 @@
+Keyboard integration:
+
+Ctrl+Alt+R - Refresh
+Ctrl+Alt+F - Fullscreen Toggle
+Ctrl+Alt+S - Scale Toggle
+Ctrl+Alt+Insert - Send CTRL+ALT+DELETE
+
+Mouse Integration:
+
+..
