@@ -2,143 +2,69 @@
 <html xmlns="http://www.w3.org/1999/xhtml"> 
 <head>
 <title>Bosh-Technique-Like Echo-Client</title>
-<meta http-equiv="Content-Type" content="text/html;charset=UTF-8"> 
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+<link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" />
 <script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/hobs.js"></script>
 </head>
 <body>
 
-<div id="bosh_start_first">Start First</div>
-<div id="bosh_start_second">Start Second</div>
-<div id="bosh_stop">Stop</div>
-<div id="send_stuff">Stufff<input type="text" id="more_stuff" /></div>
+<div class="panel">
+  
+  <div id="bosh_connect" class="btn icon">Connect</div>
+  <div id="bosh_disconnect" class="btn icon">Disconnect</div>  
+  <input id="bosh_message" type="text" value="echo this" /> <div id="bosh_send" class="btn icon">Send Message</div>
+  
+</div>
 
+<p>&nbsp;</p><p>&nbsp;</p>
 <div id="messages" style="width: 400px; height: 300px; background-color: blue;"></div>
 
 <script type="text/javascript">
-
+  
 $(document).ready(function(){
-    
-  // Hobs provides a simple websocket-compatible interface
-  // for bidrectional communication.
-  //
-  // It utilizes websockets if available and falls back to utilizing
-  // XmlHTTPRequest in a way similar to the
-  // "BOSH Technique" (http://xmpp.org/extensions/xep-0124.html#technique).
-  //
-  // Hobs is named as an anagram after BOSH since it is inspired by the
-  // the techniques but still different and is smaller... almost hobbit-like...
-  
-  // Hobs / Websocket interface
-  
-  // Ready-states
-  var CONNECTING  = 0;
-  var OPEN        = 1;
-  var CLOSING     = 2;
-  var CLOSED      = 3;
-  
-  Hobs = {};
-  Hobs.url = '';                      // readonly attribute DOMString
-  Hobs.readystate = null;             // readonly attribute unsigned short
-  Hobs.bufferedAmount = null;         // readonly attribute unsigned long
-  
-  // Networking
-  Hobs.onopen    = function () {};    // attribute Function
-  Hobs.onmessage = function () {};    // attribute Function
-  Hobs.onclose   = function () {};    // attribute Function
-  
-  Hobs.close  = function () {};
-  Hobs.send   = function send(data) {};
-  
-  /*
-    Implementation of the interface above
-  */
-  Hobs.send = function (data) {
-    Hobs.output_queue.push(data);
-  }
-  
-  Hobs.onmessage = function (data) {
-    $('#messages').append('['+data+']')
-  }
-  
-  Hobs.Session    = { id: 0, request_id: 0, running: false };
-  Hobs.Info       = { protocol: 'http', host: 'wstest.local', port:'8080'};
-  
-  Hobs.input_queue = new Array();
-  Hobs.output_queue = new Array();
-      
-  function request() {
 
-    var xhr = createXHR();
+  $('#bosh_connect').click( function() {
+    Hobs.connect('http', 'wstest.local', '8080');
+  });
+  
+  $('#bosh_disconnect').click( function () {
+    $('#messages').append(JSON.stringify(Hobs.output_queue));
+    Hobs.close();
     
-    Hobs.Session.request_id += 1;
-    var test = 'hello dirk';
+  });
+  
+  $('#bosh_send').click( function () {
     
-    xhr.open('POST', Hobs.Info.protocol+'://'+Hobs.Info.host+':'+Hobs.Info.port+'/test/');
-    xhr.setRequestHeader("Content-Type", "text/plain");
-    xhr.onreadystatechange = function(event) {
-                    
-      // Do it again, bosh-style
-      if (xhr.readyState == 4) {
-          
-        Hobs.input_queue.push(xhr.responseText)
-        setTimeout(Hobs.onmessage, 0, xhr.responseText);
-        
-        if (Hobs.Session.running) {
-          setTimeout(request, 0);
-        }
-      }
-        
+    //var big = $('#big_data').val();
+    var big = $('#big_data').val();
+    var small = $('#bosh_message').val();
+    for(var i=0;i<10;i++) {
+      //Hobs.send(small);
+      //Hobs.send(big);
+      Hobs.send(big);
     }
-    
-    if (Hobs.output_queue.length > 0) {
-      var toSend = '';
-      for(var i=0; i<Hobs.output_queue.length; i++) {
-        toSend += Hobs.output_queue[i];
-      }
-  
-      xhr.send(toSend);
-    }
-      
-  }
-      
-  $('#bosh_start_first').click( function () {
-      Hobs.Session.running = true;
-      request();
   });
-  
-  
-  $('#bosh_start_second').click( function () {
-      Hobs.Session.running = true;
-      request();
-  });
-  
-  $('#bosh_stop').click( function () {
-      Hobs.Session.running = false;
-      for(var i=0; i< Hobs.input_queue.length; i++) {
-          $('#messages').append(Hobs.input_queue[i]);
-      }
-  });
-  
-  $('#send_stuff').click( function () {
-    Hobs.output_queue = new Array();
 
-    Hobs.send($('#more_stuff').val());
-    request();
-  });
-      
-  // Utility section
-  var createXHR = function () {
-      try { return new XMLHttpRequest(); } catch(e) {}
-      try { return new ActiveXObject('MSXML3.XMLHTTP'); } catch(e) {}
-      try { return new ActiveXObject('MSXML2.XMLHTTP.3.0'); } catch(e) {}
-      try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch(e) {}
-      try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch(e) {}
-      throw new Error('Could not find XMLHttpRequest or an alternative.');
-  };
-    
 });
 
 </script>
+
+<input type="text" id="big_data" value="
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque aliquet, felis vel accumsan tempus, diam orci venenatis risus, quis cursus ligula eros sit amet metus. Suspendisse massa orci, facilisis ac dignissim ac, rhoncus ut nisl. Morbi pharetra auctor nulla ut vehicula. Duis vel metus nulla, vitae tempor urna. In ac mi vel ipsum condimentum laoreet et sed massa. Integer posuere, sem sollicitudin luctus gravida, magna est egestas est, at volutpat lectus ligula eu tortor. Nullam tincidunt magna eget arcu rhoncus id mattis risus placerat. Curabitur interdum venenatis ligula eget feugiat. Nunc quam erat, ullamcorper a commodo at, scelerisque vitae massa. Nunc velit justo, viverra et tempor ut, posuere eu ipsum. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Proin fermentum tincidunt cursus. Aenean vel dui eget magna luctus pellentesque. Integer sed lorem quis turpis commodo porttitor. Cras eu ipsum vitae erat congue faucibus at luctus odio. Mauris mi erat, ullamcorper blandit hendrerit sit amet, placerat ut risus. Suspendisse in cursus massa. Fusce blandit imperdiet diam in interdum. Aenean nec orci urna. Suspendisse adipiscing est ac erat ultricies imperdiet.
+
+Cras vel lacus eget ligula fringilla consectetur. Praesent sollicitudin nulla ut quam faucibus rutrum. Aliquam condimentum, nunc quis suscipit pulvinar, nibh erat dapibus lorem, quis imperdiet neque magna at urna. Morbi dolor quam, cursus a commodo ut, sollicitudin at erat. Aliquam cursus turpis vulputate purus vehicula quis scelerisque orci iaculis. In non diam felis, vel consequat ante. Nam adipiscing pharetra sodales. Curabitur eros ligula, aliquam in ultricies non, hendrerit eu ligula. Donec lorem ipsum, lacinia vitae porttitor non, mollis quis arcu. Donec sit amet libero a massa lobortis varius varius quis purus. Mauris sapien felis, tincidunt tristique accumsan sed, facilisis at nisl. Maecenas pretium bibendum lorem, fringilla pellentesque diam dignissim vel. Morbi tincidunt, arcu sed dignissim fringilla, metus dui sagittis justo, sed laoreet nisi augue quis lorem.
+
+Nullam nulla massa, sollicitudin eu fringilla quis, varius non ante. Nunc nec hendrerit lorem. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed suscipit, purus sit amet ullamcorper ornare, urna risus mollis velit, non rhoncus magna diam sed elit. Vivamus et dolor purus. Sed ut orci sit amet velit tempus sagittis sit amet molestie turpis. Donec vehicula mauris ac odio laoreet feugiat. Nunc quis magna nec nunc eleifend cursus. Suspendisse semper pulvinar elit, at posuere nisl placerat sit amet. Mauris non augue ligula, eget imperdiet est. Morbi sed nulla ipsum, nec eleifend sem.
+
+Curabitur facilisis viverra risus, nec lobortis urna pellentesque in. Praesent sollicitudin ante ut diam sagittis bibendum. Fusce rhoncus magna sodales leo sagittis non dictum mauris elementum. Mauris porta bibendum consectetur. Integer id tristique lectus. Quisque non porttitor augue. Quisque quis urna nisl, a ornare sem. Integer lacinia ipsum id erat auctor vitae sodales elit auctor. Aenean in laoreet diam. Nam urna sem, ultrices a rhoncus et, euismod at libero. Curabitur elementum, sapien id convallis luctus, dolor libero elementum felis, eget ultrices quam purus vel sem.
+
+Praesent diam libero, pharetra in aliquet in, hendrerit eget justo. Donec fringilla turpis vitae mauris volutpat sed auctor tellus sodales. Mauris augue quam, mollis dictum commodo in, elementum ut risus. Quisque ultricies, nunc vitae convallis hendrerit, risus ligula varius ante, vel tempor dolor dui sit amet diam. Nulla condimentum tempus purus, in tempor orci ultrices ut. Praesent placerat hendrerit gravida. Vestibulum sapien felis, tincidunt ac vulputate venenatis, commodo eget eros. Mauris dictum, mauris gravida faucibus rhoncus, mi orci hendrerit augue, convallis interdum metus dolor quis orci. Suspendisse vulputate blandit volutpat. Proin at nisl lectus, eu varius velit. Suspendisse potenti. Cras interdum nunc vel dui rhoncus id rutrum dolor volutpat. Phasellus non leo eros. Vestibulum id rhoncus elit.
+
+Suspendisse ullamcorper dolor vitae tortor adipiscing dictum. Quisque viverra nunc ut elit ornare eu iaculis arcu ornare. Phasellus cursus suscipit enim, quis molestie purus aliquam eu. Vestibulum feugiat mauris vitae justo sollicitudin pharetra. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Maecenas lectus ante, scelerisque id dignissim eu, sollicitudin id magna. Sed ante quam, fermentum sed lobortis eget, dignissim quis erat. Nunc blandit feugiat orci, nec imperdiet quam varius et. Ut ut lacus et metus porta scelerisque vitae sit amet elit. Aliquam sit amet blandit sem.
+
+Nunc mauris magna, viverra non eleifend vitae, consequat eu metus. Fusce mauris mauris, scelerisque sit amet facilisis et, malesuada tempus orci. Morbi vel molestie odio. Nullam id mi a orci gravida semper a a quam. Curabitur non posuere.   
+" />
 
 </body>
 </html>
