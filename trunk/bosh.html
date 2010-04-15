@@ -25,38 +25,38 @@
   
 $(document).ready(function(){
 
+  var ws;
+
   $('#bosh_connect').click( function() {
-    Hobs.connect('http', 'wstest.local', '8080');
+    ws = new Hobs('http://wstest.local:8080');
+    
+    ws.onopen = function (event) {
+      $('#messages').append('[Connection is open!]');
+    }
+    
+    ws.onclose = function (event) {
+      $('#messages').append('[Connection is closing!]');
+    }
+    
+    ws.onmessage = function (event) {
+      $('#messages').append('[Got stuff'+event.data+']');
+    }
   });
   
   $('#bosh_disconnect').click( function () {
-    $('#messages').append(JSON.stringify(Hobs.output_queue));
-    Hobs.close();
-    
+    ws.close();    
   });
   
   $('#bosh_send').click( function () {
     
-    var big = $('#big_data').val();
+    var big   = $('#big_data').val();
     var small = $('#bosh_message').val();
-    for(var i=0;i<10;i++) {      
-      Hobs.send('['+i+','+small+']');
-      Hobs.send('['+i+','+big+']');
+    for(var i=0;i<10;i++) {
+      ws.send('['+i+','+small+']');
+      ws.send('['+i+','+big+']');
     }
   });
   
-  Hobs.onopen = function (data) {
-    $('#messages').append('[Connection is open!]');
-  }
-  
-  Hobs.onclose = function (data) {
-    $('#messages').append('[Connection is closing!]');
-  }
-  
-  Hobs.onmessage = function (data) {
-    $('#messages').append('[Got stuff'+data+']');
-  }
-
 });
 
 </script>
