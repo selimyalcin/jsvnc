@@ -35,6 +35,12 @@ function Hobs(url) {
   this.close  = function () {}
   
   // Implementation to support the interface above
+  // And a bonus-feature: stats on the connection!
+  
+  this.stats = {
+    bytes_recv: 0,  bytes_send: 0,
+    frames_recv: 0, frames_send: 0
+  }
   
   var self = this // I need a variable i can refer to inside of other objects
                   // referring to this inside of other objects will
@@ -56,33 +62,30 @@ function Hobs(url) {
                       sending: 0, wait: 50
                     };
   
-  var input_queue  = new Array();
   var output_queue = new Array();
+  //var input_queue = new Array();
+  var recv_buffer = '';
     
   connect(); // Connect!
   
-  // Should check if there is currently a send in progress and queue the send
-  // in that case
-  // We need the main-connection to be running!
-  // TODO: this should throw an exception...
+  // Queues data when a send is currently in progress or the state is opening
   self.send = function (data, check) {
     
     // We only try to send when hobs says that the game has begun!
-    if (self.readyState == OPEN) {
+    if (self.readyState == OPEN || self.readyState == CONNECTING) {
     
-      // If currently sending then put data into output queue
-      // It will be handled when the current send is done...
-      if (Session.sending == 1) {
+      // Buffer the send, connection is NOT ready
+      if ((Session.sending == 1) || self.readyState == CONNECTING) {
         output_queue.push(data);
         
-      // Do the actual sending
+      // Send the data, connection is ready
       } else {
         Session.sending = 1;
         q_send(data)
       }
     
     } else {
-      // TODO: trigger onerror...
+      // TODO: fire some sort of error thing...
     }
   }
   
@@ -112,6 +115,10 @@ function Hobs(url) {
                         
       if (xhr.readyState == 4) {
         
+        // Update stats
+        self.stats.bytes_recv   += xhr.responseText.length
+        self.stats.frames_recv  += 1
+        
         // Successful handshake
         if (xhr.status == 200) {
           
@@ -123,6 +130,7 @@ function Hobs(url) {
           self.readyState = OPEN;
           setTimeout(self.onopen, 0);
           setTimeout(recvLoop, 0);
+          setTimeout(input_worker, 0);
           
         } else {
           self.readyState = CLOSED;
@@ -135,6 +143,7 @@ function Hobs(url) {
     
   }
   
+  // Helper for generating request identifiers
   function generate_rid() {
     return Math.ceil(Math.random() * 10000000000);
   }
@@ -152,7 +161,7 @@ function Hobs(url) {
     xhr.onreadystatechange = function(event) {
             
       if (xhr.readyState == 4) {
-        if (xhr.status == 200) {          
+        if (xhr.status == 200) {
           
           // Check if more stuff has arrived... can I do this here?? hmmm
           if (output_queue.length>0) {
@@ -160,7 +169,8 @@ function Hobs(url) {
             for(var i=0; i<output_queue.length; i++) {
               more_data += output_queue.shift();
             }
-            q_send(more_data);
+            
+            q_send(more_data); // Send it
           } else {
             Session.sending = 0;
           }
@@ -174,24 +184,47 @@ function Hobs(url) {
     }
     xhr.send(data);
     
+    // Update stats
+    self.stats.bytes_send  += data.length;
+    self.stats.frames_send += 1
+    
+  }
+  
+  function input_worker() {
+    
+    //if (input_queue.length>0) {
+    //  for(var i=0; i<input_queue.length; i++) {
+    //    self.onmessage({data:input_queue.pop()});
+    //  }
+    //  
+    //}
+    if (recv_buffer.length>0) {
+      self.onmessage({data:recv_buffer});
+      recv_buffer = '';
+    }
+    setTimeout(input_worker, 1);
   }
   
   // Helper for maintaining incoming data, used by connect
   function recvLoop() {
     
     var xhr = createXHR();  
-    
-    Session.request_id += 1;
-    
-    xhr.open('GET', self.url+'/hobs/session/'+Session.id+'/'+Session.request_id);
+        
+    xhr.open('GET', self.url+'/hobs/session/'+Session.id);
     xhr.onreadystatechange = function(event) {
       
       if (xhr.readyState == 4) {
         if (xhr.status == 200) {
           
-          // TODO: don't trigger onmessage with keep-alive
-          input_queue.push(xhr.responseText);
-          setTimeout(self.onmessage, 0, {data: xhr.responseText} );
+          // Do not trigger onmessage with empty responses, these are keep-alive
+          if (xhr.responseText.length > 0) {
+            //setTimeout(self.onmessage, 0, {data: xhr.responseText} );
+            //self.onmessage({data: xhr.responseText} );
+            //input_queue.push(xhr.responseText);
+            recv_buffer += xhr.responseText;
+          } else {
+            $('#log').append('|KA|');
+          }
           
           // Should I do it again?
           if (self.readyState == OPEN) {
@@ -199,6 +232,10 @@ function Hobs(url) {
           } else {
             self.close();
           }
+          
+          // Update stats
+          self.stats.bytes_recv  += xhr.responseText.length
+          self.stats.frames_recv += 1
         
         // Something went wrong so the connection will be closed
         } else {

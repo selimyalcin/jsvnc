@@ -7,6 +7,7 @@
 <script type="text/javascript" src="js/jquery.base64.js"></script>
 <script type="text/javascript" src="js/base64.js"></script>
 <script type="text/javascript" src="js/socket.js"></script>
+<script type="text/javascript" src="js/hobs.js"></script>
 <script type="text/javascript" src="js/rfb.js"></script>
 <link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
 </head>
@@ -93,7 +94,8 @@
 
 $(document).ready(function(){
   
-  if ("WebSocket" in window) {
+  //if ("WebSocket" in window) {
+  if (true) {
     
     // Framebuffer dimensions and specifications
     var fb = {width:0,        height:0,       bpp:0,
@@ -116,7 +118,8 @@ $(document).ready(function(){
     var ctx; // Initialized during handshake
     
     // Communication channel
-    var ws = new WebSocket('ws://'+hosts.ws_host+':'+hosts.ws_port+'/vnc');
+    //var ws = new WebSocket('ws://'+hosts.ws_host+':'+hosts.ws_port+'/vnc');
+    var ws = new Hobs('http://wstest.local:8080');
     
     var offset = 16;
     var state =0;
@@ -150,8 +153,10 @@ $(document).ready(function(){
         
         $('#log').append('['+cursor_x+','+cursor_y+']'); // Find out about js-debug!
   
-        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 1) ));
-        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 0) ));
+        //ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 1) ));
+        //ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 0) ));
+        ws.send(pointerEvent(cursor_x, cursor_y, 1) );
+        ws.send(pointerEvent(cursor_x, cursor_y, 0) );
   
       });
       
@@ -167,12 +172,14 @@ $(document).ready(function(){
     ws.onmessage = function (evt) {
       
       var received_msg = $.base64Decode( evt.data );
+      //var received_msg = evt.data ;
       var name = '';
       var log = ''
-            
+      
+      var hej = 0;
+      
       stats.msg_recv   += 1;
-      stats.bytes_recv += received_msg.length;
-            
+
       // Debug logging of incoming messages
       log += '[<label style="color: red">'+received_msg.length;      
       if (received_msg.length < 40) {
@@ -187,22 +194,29 @@ $(document).ready(function(){
       // Send rfb version
       if (handshake_state == 0) {
         handshake_state += 1;
-        ws.send( $.base64Encode('RFB 003.008\n') );
-      
+        //ws.send( $.base64Encode('RFB 003.008\n') );
+        ws.send( 'RFB 003.008\n');
+        $('#log').append('1. Sending RFB ver');
       // Select security type
       } else if (handshake_state == 1) {
         handshake_state += 1;
-        ws.send( $.base64Encode( num_to_u8(1)) );
+        //ws.send( $.base64Encode( num_to_u8(1)) );
+        ws.send( num_to_u8(1)) ;
+        $('#log').append('2. Sending handshake');
         
       // Receive handshake status, send client-init (shared-flag)
       } else if (handshake_state == 2) {
         handshake_state += 1;
-        ws.send( $.base64Encode( num_to_u8(0) ));
+        //ws.send( $.base64Encode( num_to_u8(0) ));
+        $('#log').append('3. Sending client init');
+        ws.send( num_to_u8(0) );
+        $('#log').append('3.10 Send client init');
         
       // Receive server-init
       } else if (handshake_state == 3) {
         
         handshake_state += 1;
+        $('#log').append('4. Parse server init');
         
         fb.width  = u16_to_num(received_msg[0], received_msg[1]);
         fb.height = u16_to_num(received_msg[2], received_msg[3]);
@@ -219,13 +233,22 @@ $(document).ready(function(){
         fb.blue_shift   = u8_to_num(received_msg[16]);
         
         // Three bytes of padding 17-19
-        
+        $('#log').append('5.10 Init framebuffer');
         // Add the context
         $('#frame_container').append('<canvas id="framebuffer" width="'+fb.width+'" height="'+fb.height+'"></canvas>');        
         ctx = init_framebuffer(fb.width, fb.height);
         
         // Length of the name
+        $('#log').append('5.20 grab name length');
         name_length = u32_to_num(received_msg[20],received_msg[21],received_msg[22],received_msg[23]);
+        $('#log').append('5.21 name length'+name_length);
+        
+        // Check if there is enough buffer to get the hostname
+        if (received_msg.length == (name_length+24)) {
+          fb.name = received_msg.slice(24,24+name_length);
+          handshake_state += 1;
+          ws.send( fbur(fb.width, fb.height) );
+        }
         
         // Throw it to gui
         $('#fb_res').html(fb.width+'x'+fb.height+'x'+fb.bpp);
@@ -234,19 +257,23 @@ $(document).ready(function(){
         $('#fb_truecolor').html(fb.true_color);
         $('#fb_rgbmax').html(fb.red_max+','+fb.green_max+','+fb.blue_max);
         $('#fb_rgbshift').html(fb.red_shift+','+fb.green_shift+','+fb.blue_shift);        
-              
+        
       // Get the hostname of the vnc server
       } else if (handshake_state == 4) {
         
         handshake_state += 1;
+        $('#log').append('5.30 Is this the hostname?'+received_msg);
         $('#hostname').html(received_msg);
-        ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
+        //ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
+        $('#log').append('6. FBUR');
+        ws.send( fbur(fb.width, fb.height) );
 
       // Start handling messages from servers
       } else {
         
         // Find out what the server is sending us
-        if (msg_type == -1) {          
+        if (msg_type == -1) {
+          $('#log').append('7. Determine MSG_type');
           msg_type  = u8_to_num(received_msg[0]);
           $('#log').append('[MSG_TYPE='+msg_type+']')
         }
@@ -257,63 +284,100 @@ $(document).ready(function(){
         if (msg_type == 0) {
                     
           buffer += received_msg;
-          
-          // Number of rectangles
-          // Padding = 1 byte
-          var num_r = u16_to_num(buffer[2], buffer[3]);          
-          var rectangle = {
-            x_pos:  u16_to_num(buffer[4], buffer[5]),
-            y_pos:  u16_to_num(buffer[6], buffer[7]),
-            rect_w: u16_to_num(buffer[8], buffer[9]),
-            rect_h: u16_to_num(buffer[10], buffer[11]),
-            rect_encoding: u32_to_num(buffer[12], buffer[13], buffer[14], buffer[15])
-          };
-          
-          for(i=offset; i<buffer.length; i=i+4) {
+          if (buffer.length>15) {
+            $('#log').append('8. Parse framebufferupdate');
             
-            pixels_read += 1;
+            // Number of rectangles
+            // Padding = 1 byte
+            var num_r = u16_to_num(buffer[2], buffer[3]);          
+            var rectangle = {
+              x_pos:  u16_to_num(buffer[4], buffer[5]),
+              y_pos:  u16_to_num(buffer[6], buffer[7]),
+              rect_w: u16_to_num(buffer[8], buffer[9]),
+              rect_h: u16_to_num(buffer[10], buffer[11]),
+              rect_encoding: u32_to_num(buffer[12], buffer[13], buffer[14], buffer[15])
+            };
             
-            // Raw-encoding pixelcolor order: blue, green, red, alpha
-            // We do not use the alpha channel...
-            b = u8_to_num(buffer[i]);
-            g = u8_to_num(buffer[i+1]);
-            r = u8_to_num(buffer[i+2]);
-  
-            // Draw the pixel
-            ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
-            ctx.fillRect(col, row, 1, 1);
+            $('#log').append('9. Draw pixels');
             
-            // Fix this!
-            if ((pixels_read % (fb.width)) == 0) {
-              row +=1;
+            //for(i=offset; i<(buffer.length-2); i=i+4) {
+            //  
+            //  pixels_read += 1;
+            //  
+            //  // Raw-encoding pixelcolor order: blue, green, red, alpha
+            //  // We do not use the alpha channel...
+            //  b = u8_to_num(buffer[i]);
+            //  g = u8_to_num(buffer[i+1]);
+            //  r = u8_to_num(buffer[i+2]);
+            //  
+            //  // Draw the pixel
+            //  ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+            //  ctx.fillRect(col, row, 1, 1);
+            //  
+            //  // Fix this!
+            //  if ((pixels_read % (fb.width)) == 0) {
+            //    row +=1;
+            //    col = 0;
+            //  } else {
+            //    col += 1;
+            //  }
+            //  
+            //  if (row > fb.height) {
+            //    row = 0;
+            //  }
+            //  
+            //}
+            offset = buffer.length;
+            var rectangle_length = fb.width * fb.height *(fb.bpp/8);
+            
+            if (buffer.length == rectangle_length+16) {
+                            
+               for(var i=16; i<(buffer.length-2); i=i+4) {
+                
+                pixels_read += 1;
+                
+                // Raw-encoding pixelcolor order: blue, green, red, alpha
+                // We do not use the alpha channel...
+                b = u8_to_num(buffer[i]);
+                g = u8_to_num(buffer[i+1]);
+                r = u8_to_num(buffer[i+2]);
+                
+                // Draw the pixel
+                ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+                ctx.fillRect(col, row, 1, 1);
+                
+                // Fix this!
+                if ((pixels_read % (fb.width)) == 0) {
+                  row +=1;
+                  col = 0;
+                } else {
+                  col += 1;
+                }
+                
+                if (row > fb.height) {
+                  row = 0;
+                }
+                
+              }
+              
+              msg_type = -1;
+              buffer = '';
               col = 0;
-            } else {
-              col += 1;
-            }
-            
-            if (row > fb.height) {
               row = 0;
+              offset = 16;
+             
+              
+              $('#log').append('DONE READING RECTANGLE!');
             }
-            
           }
-          offset = buffer.length;
-          var rectangle_length = fb.width * fb.height *(fb.bpp/8);
           
-          if (buffer.length == rectangle_length+16) {
-            msg_type = -1;
-            buffer = '';
-            col = 0;
-            row = 0;
-            offset = 16;
-            $('#log').append('DONE READING RECTANGLE!');
-          }
-        
+        $('#log').append('[Buffer length: '+ buffer.length+']')
+          
         // 6.5.2 SetColourMapEntries
         // When the pixel format uses a “colour map”, this message tells the
         // client that the specified pixel values should be mapped to the given
         // RGB intensities.
-        //
-        $('#log').append('[Buffer length: '+ buffer.length+']')
+        //        
         } else if (msg_type == 1) {
           
           msg_type = -1;
@@ -351,6 +415,8 @@ $(document).ready(function(){
         
       }
   
+      $('#log').append('['+hej+'<'+received_msg.length+']')
+  
     };
     
     // WebSocket is connected. You can send data by send() method.    
@@ -363,6 +429,7 @@ $(document).ready(function(){
     ws.onclose = function() {
       $('#con_status').html('Disconnected');
       $('#con_status').removeClass('connected').addClass('disconnected');
+      $('#messages').append(JSON.stringify(ws.stats));
     };
     
     // Pin click
@@ -387,7 +454,8 @@ $(document).ready(function(){
     
     // Refresh click
     $('#refresh').click(function (event) {      
-      ws.send($.base64Encode( fbur(fb.width, fb.height )));
+      //ws.send($.base64Encode( fbur(fb.width, fb.height )));
+      ws.send( fbur(fb.width, fb.height ));
     });
     
     // Scale click
@@ -423,7 +491,7 @@ $(document).ready(function(){
     $(document).keydown(function (event) {
       
       //alert('something happened');
-      $('#log').append('[KeyDown: '+event.which+']');
+      //$('#log').append('[KeyDown: '+event.which+']');
       
     });
     
@@ -446,7 +514,7 @@ $(document).ready(function(){
     // TODO: shortcut handling here
     $(document).keypress(function (event) {
       
-      $('#log').append('[KeyPress: '+event.which+']');
+      //$('#log').append('[KeyPress: '+event.which+']');
       
     });
   

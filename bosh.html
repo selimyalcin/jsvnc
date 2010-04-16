@@ -35,7 +35,7 @@ $(document).ready(function(){
     }
     
     ws.onclose = function (event) {
-      $('#messages').append('[Connection is closing!]');
+      $('#messages').append('[Connection is closing!]'+JSON.stringify(ws.stats));
     }
     
     ws.onmessage = function (event) {
