@@ -3,13 +3,7 @@ body {
   margin: 0;
   
   text-align: center;
-  background:#ffffff url('../images/body_background.png') repeat-x right top;}
-}
-
-body div {
-  padding: 0;    
-  font-family: times, verdana;
-  height: 100%;
+  background:#ffffff url('../images/body_background.png') repeat-x right top;
 }
 
 input.host {

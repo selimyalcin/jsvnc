@@ -9,6 +9,7 @@
 <script type="text/javascript" src="js/socket.js"></script>
 <script type="text/javascript" src="js/hobs.js"></script>
 <script type="text/javascript" src="js/rfb.js"></script>
+<script type="text/javascript" src="js/des.js"></script>
 <link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
 </head>
 <body>
@@ -102,7 +103,7 @@ $(document).ready(function(){
               depth:0,        big_endian: 0,  true_color: 0,
               red_max:    0,  green_max: 0,   blue_max: 0,
               red_shift:  0,  green_shift: 0, blue_shift: 0,
-              name: '', scaled: 0};
+              name: '', scaled: 0, data: null};
     
     // Communication statistics
     var stats = { bytes_sent: 0,  bytes_recv: 0,
@@ -127,6 +128,7 @@ $(document).ready(function(){
     var row = 0;
     var col = 0;
     var pixels_read = 0;
+    var img_pointer = 0;
     
     var cut_text = '';    
     var msg_type = -1;
@@ -151,18 +153,26 @@ $(document).ready(function(){
         cursor_x = event.pageX - offset.left;
         cursor_y = event.pageY - offset.top;
         
-        $('#log').append('['+cursor_x+','+cursor_y+']'); // Find out about js-debug!
+        //$('#log').append('['+cursor_x+','+cursor_y+']'); // Find out about js-debug!
+        log('['+cursor_x+','+cursor_y+']');
   
-        //ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 1) ));
-        //ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 0) ));
-        ws.send(pointerEvent(cursor_x, cursor_y, 1) );
-        ws.send(pointerEvent(cursor_x, cursor_y, 0) );
+        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 1) ));
+        ws.send($.base64Encode( pointerEvent(cursor_x, cursor_y, 0) ));        
+        //ws.send(pointerEvent(cursor_x, cursor_y, 1) );
+        //ws.send(pointerEvent(cursor_x, cursor_y, 0) );
   
       });
       
+      $('#framebuffer').dblclick(function (event) {
+        
+        ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
+        
+      });
+      
       var context = document.getElementById('framebuffer').getContext('2d');
-      context.fillStyle = 'rgb(200,50,50)';
-      context.fillRect(0, 0, fb.width, fb.height);
+      fb.data = context.createImageData(width, height);
+
+      context.putImageData(fb.data, 0, 0);
       
       return context;      
       
@@ -174,49 +184,61 @@ $(document).ready(function(){
       var received_msg = $.base64Decode( evt.data );
       //var received_msg = evt.data ;
       var name = '';
-      var log = ''
+      var log_msg = ''
       
       var hej = 0;
       
       stats.msg_recv   += 1;
 
       // Debug logging of incoming messages
-      log += '[<label style="color: red">'+received_msg.length;      
+      log_msg += 'ML='+received_msg.length;      
       if (received_msg.length < 40) {
-        log += ': '+received_msg;
+        log_msg += ', M=['+received_msg+']';
       }
-      log += '</label>]&nbsp;';
-      $('#log').append(log);
+      log(log_msg);
 
       $('#bytes_recv').html(stats.bytes_recv);
       $('#msg_recv').html(stats.msg_recv);
 
       // Send rfb version
       if (handshake_state == 0) {
+        
+        log('1. RFB VER -->');
+        
         handshake_state += 1;
-        //ws.send( $.base64Encode('RFB 003.008\n') );
-        ws.send( 'RFB 003.008\n');
-        $('#log').append('1. Sending RFB ver');
+        ws.send( $.base64Encode('RFB 003.008\n') );
+        //ws.send( 'RFB 003.008\n');
+        
+        log('1.10 RFB VER.');
+        
       // Select security type
       } else if (handshake_state == 1) {
+        
+        log('2. HANDSHAKE -->');
+        
         handshake_state += 1;
-        //ws.send( $.base64Encode( num_to_u8(1)) );
-        ws.send( num_to_u8(1)) ;
-        $('#log').append('2. Sending handshake');
+        ws.send( $.base64Encode( num_to_u8(1)) );
+        //ws.send( num_to_u8(1)) ;
+        
+        log('2.10 HANDSHAKE.');
         
       // Receive handshake status, send client-init (shared-flag)
       } else if (handshake_state == 2) {
-        handshake_state += 1;
-        //ws.send( $.base64Encode( num_to_u8(0) ));
-        $('#log').append('3. Sending client init');
-        ws.send( num_to_u8(0) );
-        $('#log').append('3.10 Send client init');
+                
+        log('3. CLI INIT -->');
         
+        handshake_state += 1;
+        //ws.send( num_to_u8(0) );
+        ws.send( $.base64Encode( num_to_u8(0) ));
+        
+        log('3.10 CLI INIT.');
+                
       // Receive server-init
       } else if (handshake_state == 3) {
         
-        handshake_state += 1;
-        $('#log').append('4. Parse server init');
+        log('4. Server Init <--');
+        
+        handshake_state += 1;        
         
         fb.width  = u16_to_num(received_msg[0], received_msg[1]);
         fb.height = u16_to_num(received_msg[2], received_msg[3]);
@@ -233,21 +255,23 @@ $(document).ready(function(){
         fb.blue_shift   = u8_to_num(received_msg[16]);
         
         // Three bytes of padding 17-19
-        $('#log').append('5.10 Init framebuffer');
+        log('5.10 Init Framebuffer !');
+        
         // Add the context
         $('#frame_container').append('<canvas id="framebuffer" width="'+fb.width+'" height="'+fb.height+'"></canvas>');        
         ctx = init_framebuffer(fb.width, fb.height);
         
         // Length of the name
-        $('#log').append('5.20 grab name length');
+        log('5.20 Name length >');
         name_length = u32_to_num(received_msg[20],received_msg[21],received_msg[22],received_msg[23]);
-        $('#log').append('5.21 name length'+name_length);
+        log('5.21 Name length < ');
         
         // Check if there is enough buffer to get the hostname
         if (received_msg.length == (name_length+24)) {
           fb.name = received_msg.slice(24,24+name_length);
           handshake_state += 1;
-          ws.send( fbur(fb.width, fb.height) );
+          //ws.send( fbur(fb.width, fb.height) );
+          ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
         }
         
         // Throw it to gui
@@ -262,20 +286,21 @@ $(document).ready(function(){
       } else if (handshake_state == 4) {
         
         handshake_state += 1;
-        $('#log').append('5.30 Is this the hostname?'+received_msg);
+        
+        log('5.30 Is this the hostname?'+received_msg);
         $('#hostname').html(received_msg);
-        //ws.send( $.base64Encode( fbur(fb.width, fb.height) ));
-        $('#log').append('6. FBUR');
-        ws.send( fbur(fb.width, fb.height) );
+        log('6. FBUR ->');
+        ws.send( $.base64Encode( fbur(fb.width, fb.height) ));        
+        //ws.send( fbur(fb.width, fb.height) );
 
       // Start handling messages from servers
       } else {
         
         // Find out what the server is sending us
         if (msg_type == -1) {
-          $('#log').append('7. Determine MSG_type');
+          log('7. Determine MSG_type');
           msg_type  = u8_to_num(received_msg[0]);
-          $('#log').append('[MSG_TYPE='+msg_type+']')
+          log('[MSG_TYPE='+msg_type+']')
         }
         
         // Handle what the server is sending us
@@ -285,7 +310,7 @@ $(document).ready(function(){
                     
           buffer += received_msg;
           if (buffer.length>15) {
-            $('#log').append('8. Parse framebufferupdate');
+            log('8. Parse framebufferupdate');
             
             // Number of rectangles
             // Padding = 1 byte
@@ -298,80 +323,71 @@ $(document).ready(function(){
               rect_encoding: u32_to_num(buffer[12], buffer[13], buffer[14], buffer[15])
             };
             
-            $('#log').append('9. Draw pixels');
+            log('9. Draw pixels');
             
-            //for(i=offset; i<(buffer.length-2); i=i+4) {
-            //  
-            //  pixels_read += 1;
-            //  
-            //  // Raw-encoding pixelcolor order: blue, green, red, alpha
-            //  // We do not use the alpha channel...
-            //  b = u8_to_num(buffer[i]);
-            //  g = u8_to_num(buffer[i+1]);
-            //  r = u8_to_num(buffer[i+2]);
-            //  
-            //  // Draw the pixel
-            //  ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
-            //  ctx.fillRect(col, row, 1, 1);
-            //  
-            //  // Fix this!
-            //  if ((pixels_read % (fb.width)) == 0) {
-            //    row +=1;
-            //    col = 0;
-            //  } else {
-            //    col += 1;
-            //  }
-            //  
-            //  if (row > fb.height) {
-            //    row = 0;
-            //  }
-            //  
-            //}
+            for(i=offset; i<(buffer.length-2); i=i+4) {
+              
+              var idx = pixels_read*4;
+              
+              //fb.data.data[i] = u8_to_num(buffer[i]);
+              //fb.data.data[i+1] = u8_to_num(buffer[i+1]);
+              //fb.data.data[i+2] = u8_to_num(buffer[i+2]);
+              
+              fb.data.data[idx]   = u8_to_num(buffer[i+2]);
+              fb.data.data[idx+1] = u8_to_num(buffer[i+1]);
+              fb.data.data[idx+2] = u8_to_num(buffer[i]);
+              fb.data.data[idx+3] = 255;
+              
+              pixels_read += 1;
+              
+              // Raw-encoding pixelcolor order: blue, green, red, alpha
+              // We do not use the alpha channel...
+              //b = u8_to_num(buffer[i]);
+              //g = u8_to_num(buffer[i+1]);
+              //r = u8_to_num(buffer[i+2]);
+              
+              
+              //fb.data.data[i+2] = u8_to_num(buffer[i+2]);
+              
+              // Draw the pixel
+              //ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+              //ctx.fillRect(col, row, 1, 1);
+              
+              // Fix this!
+              if ((pixels_read % (fb.width)) == 0) {
+                row +=1;
+                col = 0;
+              } else {
+                col += 1;
+              }
+              
+              if (row > fb.height) {
+                row = 0;
+              }
+              
+            }
+            
+            ctx.putImageData( fb.data, 0, 0 );
+            
             offset = buffer.length;
             var rectangle_length = fb.width * fb.height *(fb.bpp/8);
             
             if (buffer.length == rectangle_length+16) {
-                            
-               for(var i=16; i<(buffer.length-2); i=i+4) {
-                
-                pixels_read += 1;
-                
-                // Raw-encoding pixelcolor order: blue, green, red, alpha
-                // We do not use the alpha channel...
-                b = u8_to_num(buffer[i]);
-                g = u8_to_num(buffer[i+1]);
-                r = u8_to_num(buffer[i+2]);
-                
-                // Draw the pixel
-                ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
-                ctx.fillRect(col, row, 1, 1);
-                
-                // Fix this!
-                if ((pixels_read % (fb.width)) == 0) {
-                  row +=1;
-                  col = 0;
-                } else {
-                  col += 1;
-                }
-                
-                if (row > fb.height) {
-                  row = 0;
-                }
-                
-              }
               
+              pixels_read = 0;
               msg_type = -1;
               buffer = '';
               col = 0;
               row = 0;
               offset = 16;
-             
               
-              $('#log').append('DONE READING RECTANGLE!');
+              
+              
+              log('DONE READING RECTANGLE!');
             }
           }
           
-        $('#log').append('[Buffer length: '+ buffer.length+']')
+        log('[Buffer length: '+ buffer.length+']')
           
         // 6.5.2 SetColourMapEntries
         // When the pixel format uses a “colour map”, this message tells the
@@ -415,7 +431,7 @@ $(document).ready(function(){
         
       }
   
-      $('#log').append('['+hej+'<'+received_msg.length+']')
+      //$('#log').append('['+hej+'<'+received_msg.length+']')
   
     };
     
@@ -423,13 +439,14 @@ $(document).ready(function(){
     ws.onopen = function() {
       $('#con_status > span').html('Connected');
       $('#con_status').removeClass('disconnected').addClass('connected');
+      $('#log').append('Connected!');
     };
     
     // WebSocket is disconnected.
     ws.onclose = function() {
       $('#con_status').html('Disconnected');
       $('#con_status').removeClass('connected').addClass('disconnected');
-      $('#messages').append(JSON.stringify(ws.stats));
+      $('#log').append('Disconnected!');
     };
     
     // Pin click
@@ -454,8 +471,8 @@ $(document).ready(function(){
     
     // Refresh click
     $('#refresh').click(function (event) {      
-      //ws.send($.base64Encode( fbur(fb.width, fb.height )));
-      ws.send( fbur(fb.width, fb.height ));
+      ws.send($.base64Encode( fbur(fb.width, fb.height )));
+      //ws.send( fbur(fb.width, fb.height ));
     });
     
     // Scale click
@@ -485,38 +502,39 @@ $(document).ready(function(){
     // Disconnect click
     $('#disconnect').click(function () {
       ws.close();
+      window.console.log("test");
     });
     
     // Input listener
-    $(document).keydown(function (event) {
-      
-      //alert('something happened');
-      //$('#log').append('[KeyDown: '+event.which+']');
-      
-    });
-    
-    // Input listener
-    $(document).keyup(function (event) {
-      //
-      ////alert('something happened');
-      //$('#log').append('[KeyUp: '+event.which+']');
-      //ws.send( keyEvent( 112, 1) );
-      //ws.send( keyEvent( 112, 0) );
-      ////ws.send( keyEvent( event.which, 1) );
-      ////ws.send( keyEvent( event.which, 0) );
-      //
-      //$('#log').append('[wtf?: '+keyEvent( event.which, 1)+']');
-      
-      
-    });
-    
-    // Input listener
-    // TODO: shortcut handling here
-    $(document).keypress(function (event) {
-      
-      //$('#log').append('[KeyPress: '+event.which+']');
-      
-    });
+    //$(document).keydown(function (event) {
+    //  
+    //  //alert('something happened');
+    //  //$('#log').append('[KeyDown: '+event.which+']');
+    //  
+    //});
+    //
+    //// Input listener
+    //$(document).keyup(function (event) {
+    //  //
+    //  ////alert('something happened');
+    //  //$('#log').append('[KeyUp: '+event.which+']');
+    //  //ws.send( keyEvent( 112, 1) );
+    //  //ws.send( keyEvent( 112, 0) );
+    //  ////ws.send( keyEvent( event.which, 1) );
+    //  ////ws.send( keyEvent( event.which, 0) );
+    //  //
+    //  //$('#log').append('[wtf?: '+keyEvent( event.which, 1)+']');
+    //  
+    //  
+    //});
+    //
+    //// Input listener
+    //// TODO: shortcut handling here
+    //$(document).keypress(function (event) {
+    //  
+    //  //$('#log').append('[KeyPress: '+event.which+']');
+    //  
+    //});
   
   // The browser do not support WebSocket.
   } else {
