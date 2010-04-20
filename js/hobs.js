@@ -11,6 +11,11 @@
 // it is different... comet-thingy... smaller... almost hobbit-like...
 //
 
+function log(msg) {
+  //$('#log').append(msg);
+  console.log(msg);
+}
+
 function Hobs(url) {
   
   // Hobs / Websocket interface
@@ -218,12 +223,10 @@ function Hobs(url) {
           
           // Do not trigger onmessage with empty responses, these are keep-alive
           if (xhr.responseText.length > 0) {
-            //setTimeout(self.onmessage, 0, {data: xhr.responseText} );
-            //self.onmessage({data: xhr.responseText} );
-            //input_queue.push(xhr.responseText);
             recv_buffer += xhr.responseText;
           } else {
-            $('#log').append('|KA|');
+            log('KA');
+            //$('#log').append('|KA|');
           }
           
           // Should I do it again?
