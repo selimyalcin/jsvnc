@@ -6,6 +6,8 @@
 <link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" />
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/hobs.js"></script>
+<script type="text/javascript" src="js/socket.js"></script>
+<script type="text/javascript" src="js/rfb.js"></script>
 </head>
 <body>
 
@@ -16,7 +18,7 @@
   <input id="bosh_message" type="text" value="{{{smallstufff}}}" /> <div id="bosh_send" class="btn icon">Send Message</div>
   
 </div>
-<canvas id="myCanvasElt">You do not support HTML5 canvas!</canvas>
+<canvas id="la_canvas">You do not support HTML5 canvas!</canvas>
 <p>&nbsp;</p><p>&nbsp;</p>
 <div id="messages" style="width: 400px; height: 300px; background-color: blue;"></div>
 
@@ -25,79 +27,57 @@
 
 $(document).ready(function(){
 
-  var canvas = document.getElementById('myCanvasElt');
+  var canvas = document.getElementById('la_canvas');
   var ctx = canvas.getContext('2d');
   var canvasData = ctx.createImageData(canvas.width, canvas.height);
   
-  // Mandelbrot
-  function computeColor(x, y) {
-      x = 2.5 * (x/canvas.width - 0.5);
-      y = 2 * (y/canvas.height - 0.5);
-      var x0 = x;
-      var y0 = y;
-  
-      var iteration = 0;
-      var max_iteration = 100;
-  
-      while (x * x + y * y <= 4 && iteration < max_iteration ) {
-          var xtemp = x*x - y*y + x0;
-          y = 2*x*y + y0;
-          x = xtemp;
-          iteration++;
-      }
-  
-      return Math.round(255 * iteration / max_iteration);
-  }
-  
-  for (var x = 0; x < canvasData.width; x++) {
-      for (var y = 0; y < canvasData.height; y++) {
-          var color = 100;
-  
-          // Index of the pixel in the array
-          var idx = (x + y * canvas.width) * 4;
-  
-          // Update the values of the pixel;
-          canvasData.data[idx + 0] = color;
-          canvasData.data[idx + 1] = color;
-          canvasData.data[idx + 2] = color;
-          canvasData.data[idx + 3] = 0;
-      }
-  }
-  
-  ctx.putImageData(canvasData, 0, 0);
+  var w = 100;
+  var h = 100;
 
-
-  var ws;
-
-  $('#bosh_connect').click( function() {
-    ws = new Hobs('http://wstest.local:8080');
-    
-    ws.onopen = function (event) {
-      $('#messages').append('[Connection is open!]');
-    }
-    
-    ws.onclose = function (event) {
-      $('#messages').append('[Connection is closing!]'+JSON.stringify(ws.stats));
-    }
-    
-    ws.onmessage = function (event) {
-      $('#messages').append('[Got stuff'+event.data+']');
-    }
-  });
+  ctx.fillStyle = "rgb(200,0,0)";  
+  ctx.fillRect(0, 0, w, h);
+  var red = ctx.getImageData(0,0,w, h);
   
-  $('#bosh_disconnect').click( function () {
-    ws.close();    
-  });
+  ctx.fillStyle = "rgb(0,200,0)";  
+  ctx.fillRect(0, 0, w, h);
+  var green  = ctx.getImageData(0,0, w, h);
   
-  $('#bosh_send').click( function () {
-    
-    var big   = $('#big_data').val();
-    var small = $('#bosh_message').val();
-    for(var i=0;i<10;i++) {
-      ws.send('['+i+','+small+']');
-      ws.send('['+i+','+big+']');
-    }
-  });
+  ctx.fillStyle = "rgb(0,0,200)";  
+  ctx.fillRect(0, 0, w, h);
+  
+  draw_rectangle(0, 0, w, h, green, ctx );
+
+  //var ws;
+
+  //$('#bosh_connect').click( function() {
+  //  ws = new Hobs('http://wstest.local:8080');
+  //  
+  //  ws.onopen = function (event) {
+  //    $('#messages').append('[Connection is open!]');
+  //  }
+  //  
+  //  ws.onclose = function (event) {
+  //    $('#messages').append('[Connection is closing!]'+JSON.stringify(ws.stats));
+  //  }
+  //  
+  //  ws.onmessage = function (event) {
+  //    $('#messages').append('[Got stuff'+event.data+']');
+  //  }
+  //});
+  //
+  //$('#bosh_disconnect').click( function () {
+  //  ws.close();    
+  //});
+  //
+  //$('#bosh_send').click( function () {
+  //  
+  //  var big   = $('#big_data').val();
+  //  var small = $('#bosh_message').val();
+  //  for(var i=0;i<10;i++) {
+  //    ws.send('['+i+','+small+']');
+  //    ws.send('['+i+','+big+']');
+  //  }
+  //});
   
 });
 
