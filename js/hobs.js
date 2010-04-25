@@ -12,8 +12,8 @@
 //
 
 function log(msg) {
-  //$('#log').append(msg);
-  console.log(msg);
+  $('#log').append(msg);
+  //console.log(msg);
 }
 
 function Hobs(url) {
@@ -225,7 +225,7 @@ function Hobs(url) {
           if (xhr.responseText.length > 0) {
             recv_buffer += xhr.responseText;
           } else {
-            log('KA');
+            //log('KA');
             //$('#log').append('|KA|');
           }
           
