@@ -119,8 +119,8 @@ $(document).ready(function(){
     var ctx; // Initialized during handshake
     
     // Communication channel
-    var ws = new WebSocket('ws://'+hosts.ws_host+':'+hosts.ws_port+'/wsocket/vnc');
-    //var ws = new Hobs('http://wstest.local:8000');
+    //var ws = new WebSocket('ws://'+hosts.ws_host+':'+hosts.ws_port+'/wsocket/'+hosts.vnc_host+'/'+hosts.vnc_port);
+    var ws = new Hobs('http://'+hosts.ws_host+':'+hosts.ws_port+'/hobs/'+hosts.vnc_host+'/'+hosts.vnc_port);
     
     var offset = 16;
     var state =0;
@@ -137,9 +137,15 @@ $(document).ready(function(){
     var pinned = 0;
     
     var num_r = -1;
-    
+        
     function blink() { $('#spinner').addClass('bullet_green'); setTimeout(unblink, 0.01); }
     function unblink() { $('#spinner').removeClass('bullet_green').addClass('bullet_blue'); }
+    
+    function fbur_poll(fb) {
+      ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));
+      setTimeout(fbur_poll, 4000, fb);
+
+    }
     
     function init_framebuffer(width, height) {
       
@@ -159,11 +165,11 @@ $(document).ready(function(){
   
       });
       
-      $('#framebuffer').dblclick(function (event) {
-        
-        ws.send( $.base64Encode( fbur(fb.width, fb.height, 1) ));
-        
-      });
+      //$('#framebuffer').dblclick(function (event) {
+      //  
+      //  ws.send( $.base64Encode( fbur(fb.width, fb.height, 1) ));
+      //  
+      //});
       
       var context = document.getElementById('framebuffer').getContext('2d');
       fb.data = context.createImageData(width, height);
@@ -246,7 +252,9 @@ $(document).ready(function(){
         if (received_msg.length == (name_length+24)) {
           fb.name = received_msg.slice(24,24+name_length);
           handshake_state += 1;
-          ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));
+          //ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));
+          fbur_poll(fb);
+          
         }
         
         // Throw it to gui
@@ -263,7 +271,9 @@ $(document).ready(function(){
         handshake_state += 1;
         
         $('#hostname').html(received_msg);
-        ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));        
+        //ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));
+        fbur_poll(fb);
+        
 
       // Start handling messages from servers
       } else {
@@ -435,33 +445,12 @@ $(document).ready(function(){
     });
     
     // Input listener
-    //$(document).keydown(function (event) {
-    //  
-    //  //alert('something happened');
-    //  //$('#log').append('[KeyDown: '+event.which+']');
-    //  
-    //});
-    //
-    //// Input listener
     //$(document).keyup(function (event) {
-    //  //
-    //  ////alert('something happened');
-    //  //$('#log').append('[KeyUp: '+event.which+']');
-    //  //ws.send( keyEvent( 112, 1) );
-    //  //ws.send( keyEvent( 112, 0) );
-    //  ////ws.send( keyEvent( event.which, 1) );
-    //  ////ws.send( keyEvent( event.which, 0) );
-    //  //
-    //  //$('#log').append('[wtf?: '+keyEvent( event.which, 1)+']');
     //  
-    //  
-    //});
-    //
-    //// Input listener
-    //// TODO: shortcut handling here
-    //$(document).keypress(function (event) {
-    //  
-    //  //$('#log').append('[KeyPress: '+event.which+']');
+    //  // Filter input somehow... mouse input is different.. map it "manually"..
+    //  log('[KeyUp: '+event.which+','+String.fromCharCode(event.which)+']');
+    //  ws.send( $.base64Encode( keyEvent(event.which, 1)));
+    //  ws.send( $.base64Encode( keyEvent(event.which, 0)));
     //  
     //});
   
