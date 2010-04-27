@@ -13,13 +13,12 @@
 
 function log(msg) {
   $('#log').append(msg);
-  //console.log(msg);
 }
 
 function Hobs(url) {
   
   // Hobs / Websocket interface
-  this.url = url;
+  this.url = parseUri(url);
   
   var CONNECTING  = 0;
   var OPEN        = 1;
@@ -68,7 +67,6 @@ function Hobs(url) {
                     };
   
   var output_queue = new Array();
-  //var input_queue = new Array();
   var recv_buffer = '';
     
   connect(); // Connect!
@@ -114,7 +112,7 @@ function Hobs(url) {
     // Create the request-identifier offset
     Session.request_id = generate_rid();
     
-    xhr.open('GET', self.url+'/hobs/create/'+Session.request_id+'/'+Session.wait);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/create/'+Session.request_id+'/'+Session.wait+self.url.path);
     
     xhr.onreadystatechange = function(event) {
                         
@@ -160,7 +158,7 @@ function Hobs(url) {
     
     var xhr = createXHR();
     
-    xhr.open('POST', self.url+'/hobs/session/'+Session.id+'/'+Session.request_id);
+    xhr.open('POST', self.url.protocol+'://'+self.url.host+':'+self.url.port+self.url.path+'/hobs/session/'+Session.id+'/'+Session.request_id);
     xhr.setRequestHeader("Content-Type", "text/plain");
     
     xhr.onreadystatechange = function(event) {
@@ -197,12 +195,6 @@ function Hobs(url) {
   
   function input_worker() {
     
-    //if (input_queue.length>0) {
-    //  for(var i=0; i<input_queue.length; i++) {
-    //    self.onmessage({data:input_queue.pop()});
-    //  }
-    //  
-    //}
     if (recv_buffer.length>0) {
       self.onmessage({data:recv_buffer});
       recv_buffer = '';
@@ -215,7 +207,7 @@ function Hobs(url) {
     
     var xhr = createXHR();  
         
-    xhr.open('GET', self.url+'/hobs/session/'+Session.id);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+self.url.path+'/hobs/session/'+Session.id);
     xhr.onreadystatechange = function(event) {
       
       if (xhr.readyState == 4) {
@@ -224,10 +216,7 @@ function Hobs(url) {
           // Do not trigger onmessage with empty responses, these are keep-alive
           if (xhr.responseText.length > 0) {
             recv_buffer += xhr.responseText;
-          } else {
-            //log('KA');
-            //$('#log').append('|KA|');
-          }
+          } 
           
           // Should I do it again?
           if (self.readyState == OPEN) {
@@ -253,3 +242,37 @@ function Hobs(url) {
   }
   
 }
+
+/* UTILITY FUNCTIONS: base64-en-de-coding, url parsing */
+
+// parseUri 1.2.2
+// (c) Steven Levithan <stevenlevithan.com>
+// MIT License
+function parseUri (str) {
+  var	o   = parseUri.options,
+      m   = o.parser[o.strictMode ? "strict" : "loose"].exec(str),
+      uri = {},
+      i   = 14;
+
+  while (i--) uri[o.key[i]] = m[i] || "";
+
+  uri[o.q.name] = {};
+  uri[o.key[12]].replace(o.q.parser, function ($0, $1, $2) {
+    if ($1) uri[o.q.name][$1] = $2;
+  });
+
+  return uri;
+};
+
+parseUri.options = {
+  strictMode: false,
+  key: ["source","protocol","authority","userInfo","user","password","host","port","relative","path","directory","file","query","anchor"],
+  q:   {
+    name:   "queryKey",
+    parser: /(?:^|&)([^&=]*)=?([^&]*)/g
+  },
+  parser: {
+    strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+    loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
+  }
+};
