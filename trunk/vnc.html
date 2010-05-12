@@ -1,0 +1,107 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+<title>jsVNC</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" /> 
+<script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/jquery.base64.js"></script>
+<script type="text/javascript" src="js/base64.js"></script>
+<script type="text/javascript" src="js/socket.js"></script>
+<script type="text/javascript" src="js/hobs.js"></script>
+<script type="text/javascript" src="js/vnc.js"></script>
+<link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
+</head>
+<body>
+
+<div id="frame_container">
+
+  <div id="panel" class="panel">
+    <div id="pin"     class="btn icon pin"      title="Controls whether the panel should be visible.">Pin</div>
+    <div id="refresh" class="btn icon refresh"  title="Request a full display update.">Refresh</div>
+    <div id="scale"   class="btn icon scale"    title="Scale the display to fit in the current window.">Scale</div>
+    
+    <div id="con_status" class="info icon">
+      
+      <fieldset>
+      
+      <table>
+        <tr><td>Bytes sent/recv</td><td><span id="bytes_sent">0</span>/<span id="bytes_recv">0</span></td></tr>
+        <tr><td>Messages sent/recv</td><td><span id="msg_sent">0</span>/<span id="msg_recv">0</span></td></tr>
+      </table>
+      </fieldset>
+      
+      <span>Unknown</span>
+  
+    </div>
+    <div id="host_status" class="info icon machine">
+      
+      <fieldset>
+        
+        <table>
+          <tr><td>Hostname</td><td><span    id="hostname">Unknown</span></td></tr>
+          <tr><td>Resolution</td><td><span  id="fb_res">0x0x0</span></td></tr>
+          <tr><td>Color Depth</td><td><span id="fb_depth">Unknown</span></td></tr>
+          <tr><td>Big Endian</td><td><span  id="fb_endian">Unknown</span></td></tr>
+          <tr><td>True Color</td><td><span  id="fb_truecolor">Unknown</span></td></tr>
+          <tr><td>RGB Max:</td><td>(<span   id="fb_rgbmax">,,</span>)</td></tr>
+          <tr><td>RGB Shift:</td><td>(<span id="fb_rgbshift">,,</span>)</td></tr>
+        </table>  
+      </fieldset>
+      
+      <span>Unknown</span>
+    </div>
+  
+    <div class="info icon log">  
+      <fieldset>    
+      <pre id="log"></pre>
+      </fieldset>
+      
+      <span>Log</span>
+    </div>
+    &nbsp;  
+    <div id="disconnect"  title="Close the current connection."   class="btn icon disconnect" >Disconnect</div>
+      
+    <div class="info">
+      
+      <fieldset>
+      
+        <table>
+          <tr>
+            <td>VNC Host/Port</td>
+            <td><input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost" />
+              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900" />
+            </td>
+          </tr>
+          <tr>
+            <td>WS Host/Port</td>
+            <td><input id="ws_host" class="host" type="text" name="ws_host" value="mifcho.safl.dk" />
+               / <input id="ws_port" type="text" class="port" name="ws_port" value="8080" />
+            </td>
+          </tr>
+          <tr><td colspan="2"><div id="connect" class="btn icon connect">Connect</div></td></tr>
+        </table>
+      
+      </fieldset>
+      
+      <span>Reconnect</span>
+      
+    </div>
+  </div>
+
+</div>
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+  
+  var vnc = new Vnc({vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
+                     ws_host: $('#ws_host').val(), ws_port: $('#ws_port').val()});
+  vnc.connect();
+  
+});
+
+</script>
+
+</body>
+</html>
+

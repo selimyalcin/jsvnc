@@ -8,8 +8,7 @@
 <script type="text/javascript" src="js/base64.js"></script>
 <script type="text/javascript" src="js/socket.js"></script>
 <script type="text/javascript" src="js/hobs.js"></script>
-<script type="text/javascript" src="js/rfb.js"></script>
-<script type="text/javascript" src="js/des.js"></script>
+<script type="text/javascript" src="js/vnc.js"></script>
 <link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
 </head>
 <body>
@@ -54,7 +53,7 @@
   
     <div class="info icon log">  
       <fieldset>    
-      <div id="log"></div>
+      <pre id="log"></pre>
       </fieldset>
       
       <span>Log</span>
@@ -69,13 +68,13 @@
         <table>
           <tr>
             <td>VNC Host/Port</td>
-            <td><input id="vnc_host" class="host" type="text" name="vnc_host" value="255.255.255.255" />
+            <td><input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost" />
               / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900" />
             </td>
           </tr>
           <tr>
             <td>WS Host/Port</td>
-            <td><input id="ws_host" class="host" type="text" name="ws_host" value="wstest.local" />
+            <td><input id="ws_host" class="host" type="text" name="ws_host" value="mifcho.safl.dk" />
                / <input id="ws_port" type="text" class="port" name="ws_port" value="8000" />
             </td>
           </tr>
@@ -93,10 +92,14 @@
 
 <script type="text/javascript">
 
+
 $(document).ready(function(){
   
+  var vnc = new Vnc({vnc_host:'127.0.0.1'});
+  vnc.connect();
+  
   //if ("WebSocket" in window) {
-  if (true) {
+  if (false) {
     
     // Framebuffer dimensions and specifications
     var fb = {width:0,        height:0,       bpp:0,
@@ -104,6 +107,8 @@ $(document).ready(function(){
               red_max:    0,  green_max: 0,   blue_max: 0,
               red_shift:  0,  green_shift: 0, blue_shift: 0,
               name: '', scaled: 0, data: null};
+  
+    var buffer = '';
     
     // Communication statistics
     var stats = { bytes_sent: 0,  bytes_recv: 0,
@@ -144,7 +149,6 @@ $(document).ready(function(){
     function fbur_poll(fb) {
       ws.send( $.base64Encode( fbur(fb.width, fb.height, 0) ));
       setTimeout(fbur_poll, 4000, fb);
-
     }
     
     function init_framebuffer(width, height) {

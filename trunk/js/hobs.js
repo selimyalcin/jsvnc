@@ -11,6 +11,8 @@
 // it is different... comet-thingy... smaller... almost hobbit-like...
 //
 
+// Add base64 encoding!
+
 function log(msg) {
   $('#log').append(msg);
 }
@@ -18,7 +20,8 @@ function log(msg) {
 function Hobs(url) {
   
   // Hobs / Websocket interface
-  this.url = parseUri(url);
+  this.url  = parseUri(url);
+  this.args = parseArgs(this.url);
   
   var CONNECTING  = 0;
   var OPEN        = 1;
@@ -112,7 +115,7 @@ function Hobs(url) {
     // Create the request-identifier offset
     Session.request_id = generate_rid();
     
-    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/create/'+Session.request_id+'/'+Session.wait+self.url.path);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/create/'+Session.request_id+'/'+Session.wait+'/'+self.args.host+'/'+self.args.port);
     
     xhr.onreadystatechange = function(event) {
                         
@@ -149,6 +152,21 @@ function Hobs(url) {
   // Helper for generating request identifiers
   function generate_rid() {
     return Math.ceil(Math.random() * 10000000000);
+  }
+  
+  // Parses /hej:123/med:321/dig:666 to {'hej': 123, 'med': 321, 'dig': 666}
+  function parseArgs(url) {
+    
+    var pairs = url.path.split('/');
+    var args  = {};
+        
+    for(var i=0; i< pairs.length; i++) {
+      var pair = pairs[i].split(':',2);
+      args[pair[0]] = pair[1];
+    }
+    
+    return args;
+    
   }
   
   // Helper for outgoing data, used by send()
