@@ -11,11 +11,54 @@
 // it is different... comet-thingy... smaller... almost hobbit-like...
 //
 
-// Add base64 encoding!
+/* UTILITY FUNCTIONS: url parsing, num-to-binary and binary-to-num */
 
+// Could be fun to implement something like the python struct library...
+// Anyway this is sufficient
+function num_to_u8(w)   { return String.fromCharCode(w&255); };
+function num_to_u16(w)  { return String.fromCharCode((w>>8)&255, w&255); };
+function num_to_u32(w)  { return String.fromCharCode((w>>24)&255, (w>>16)&255, (w>>8)&255, w&255); };
+
+function u8_to_num(w)               { return w.charCodeAt(0); };
+function u16_to_num(w1, w2)         { return (w1.charCodeAt(0)<<8)  + w2.charCodeAt(0); };
+function u32_to_num(w1, w2, w3, w4) { return (w1.charCodeAt(0)<<24) + (w2.charCodeAt(0)<<16)+(w3.charCodeAt(0)<<8)+w4.charCodeAt(0); }
+
+// Basic logger
 function log(msg) {
   $('#log').append(msg);
 }
+
+// parseUri 1.2.2
+// (c) Steven Levithan <stevenlevithan.com>
+// MIT License
+function parseUri (str) {
+  var	o   = parseUri.options,
+      m   = o.parser[o.strictMode ? "strict" : "loose"].exec(str),
+      uri = {},
+      i   = 14;
+
+  while (i--) uri[o.key[i]] = m[i] || "";
+
+  uri[o.q.name] = {};
+  uri[o.key[12]].replace(o.q.parser, function ($0, $1, $2) {
+    if ($1) uri[o.q.name][$1] = $2;
+  });
+
+  return uri;
+};
+
+parseUri.options = {
+  strictMode: false,
+  key: ["source","protocol","authority","userInfo","user","password","host","port","relative","path","directory","file","query","anchor"],
+  q:   {
+    name:   "queryKey",
+    parser: /(?:^|&)([^&=]*)=?([^&]*)/g
+  },
+  parser: {
+    strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+    loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
+  }
+};
 
 function Hobs(url) {
   
@@ -176,7 +219,7 @@ function Hobs(url) {
     
     var xhr = createXHR();
     
-    xhr.open('POST', self.url.protocol+'://'+self.url.host+':'+self.url.port+self.url.path+'/hobs/session/'+Session.id+'/'+Session.request_id);
+    xhr.open('POST', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/session/'+Session.id+'/'+Session.request_id);
     xhr.setRequestHeader("Content-Type", "text/plain");
     
     xhr.onreadystatechange = function(event) {
@@ -225,7 +268,7 @@ function Hobs(url) {
     
     var xhr = createXHR();  
         
-    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+self.url.path+'/hobs/session/'+Session.id);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/session/'+Session.id);
     xhr.onreadystatechange = function(event) {
       
       if (xhr.readyState == 4) {
@@ -260,37 +303,3 @@ function Hobs(url) {
   }
   
 }
-
-/* UTILITY FUNCTIONS: base64-en-de-coding, url parsing */
-
-// parseUri 1.2.2
-// (c) Steven Levithan <stevenlevithan.com>
-// MIT License
-function parseUri (str) {
-  var	o   = parseUri.options,
-      m   = o.parser[o.strictMode ? "strict" : "loose"].exec(str),
-      uri = {},
-      i   = 14;
-
-  while (i--) uri[o.key[i]] = m[i] || "";
-
-  uri[o.q.name] = {};
-  uri[o.key[12]].replace(o.q.parser, function ($0, $1, $2) {
-    if ($1) uri[o.q.name][$1] = $2;
-  });
-
-  return uri;
-};
-
-parseUri.options = {
-  strictMode: false,
-  key: ["source","protocol","authority","userInfo","user","password","host","port","relative","path","directory","file","query","anchor"],
-  q:   {
-    name:   "queryKey",
-    parser: /(?:^|&)([^&=]*)=?([^&]*)/g
-  },
-  parser: {
-    strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
-    loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
-  }
-};
