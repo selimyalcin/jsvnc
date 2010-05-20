@@ -1,5 +1,17 @@
-// requires hobs.js and socket.js
+// requires hobs.js
 
+/*
+ 
+ Interface:
+ 
+ vnc.connect()
+ vnc.disconnect
+ 
+ vnc.server_info
+ vnc.state
+ vnc.onstatechange
+ 
+*/
 function Vnc(o) {
   
   // Default values
@@ -29,17 +41,20 @@ function Vnc(o) {
   var HANDSHAKE_SEC       = 120;  
   var HANDSHAKE_SEC_RES   = 140;
   var HANDSHAKE_SRV_INIT  = 150;
-  var CONNECTED     = 200;
+  var CONNECTED           = 200;
+  var CONNECTED_RECV_FB   = 210;
   var DISCONNECTED  = 300;
-  
-  self.state  = CONNECTING;
+    
+  self.state  = DISCONNECTED;
   
   // Framebuffer dimensions, servername and some other stuff
   self.server_info = {width:      0,  height:       0,  bpp:        0,
                       depth:      0,  big_endian:   0,  true_color: 0,
                       red_max:    0,  green_max:    0,  blue_max:   0,
                       red_shift:  0,  green_shift:  0,  blue_shift: 0,
-                      name:       '', scaled:       0,  ver: ''};  
+                      name:       '', scaled:       0,  ver: '',
+                      bytes_sent:0, bytes_recv:0};
+                      
   var ctx; // Initialized during handshake
   var msg_type = -1;
   var num_r = -1;
@@ -55,19 +70,24 @@ function Vnc(o) {
   self.connect    = function () {
     
     self.state = CONNECTING;
+    setTimeout(self.onstatechange, 0, self.state);
+
     self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/tun:hobs/host:'+self.vnc_host+'/port:'+self.vnc_port+'/');
     
     self.ws.onopen = function() {
       self.state = HANDSHAKE;
+      setTimeout(self.onstatechange, 0, self.state);
     };
     
     self.ws.onclose = function() {
       self.state = DISCONNECTED;
+      setTimeout(self.onstatechange, 0, self.state);
     };
     
     // Do something with incoming data!
     self.ws.onmessage = function(event) {
       
+      self.bytes_recv += event.data.length;
       self.buffer += $.base64Decode( event.data );
       self.log('['+self.processing+','+self.buffer.length+']');
             
@@ -79,6 +99,8 @@ function Vnc(o) {
     
     self.disconnect = function () { self.ws.disconnect(); };
   }
+  
+  self.onstatechange = function () { };
   
   // A non-blocking read call. It will attempt and read bytes
   function read(size) {
@@ -92,10 +114,16 @@ function Vnc(o) {
     
   }
   
-  // Request a framebuffer update every fourth second...
-  function fbur_poll() {
-    self.ws.send( $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 0) ));
-    setTimeout(fbur_poll, 4000);
+  // Send request for updates each second.
+  // every tenth request is for a complete framebuffer
+  function fbur_poll(poll_count) {
+    
+    // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
+    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, (poll_count % 10)) );
+    self.ws.send( msg );
+    self.server_info.bytes_sent += msg.length;
+    
+    setTimeout(fbur_poll, 1000, ++poll_count);
   }
   
   var sec_types = new Array();
@@ -109,9 +137,12 @@ function Vnc(o) {
     if ((self.state == HANDSHAKE) && (self.buffer.length >= 12)) {
       
       var rfb_ver = read(12);
+      var msg = $.base64Encode('RFB 003.008\n');
+      self.ws.send( msg );
+      self.server_info.bytes_sent += msg.length;
       
-      self.ws.send( $.base64Encode('RFB 003.008\n') );
       self.state = HANDSHAKE_SEC;
+      setTimeout(self.onstatechange, 0, self.state);
       
     } else if (self.state == HANDSHAKE_SEC) {
 
@@ -127,7 +158,10 @@ function Vnc(o) {
       }
       self.log('Security types:' +num_sec+','+ JSON.stringify(sec_types));
       self.ws.send( $.base64Encode( num_to_u8(1)) ); // Select sec-type None
+      self.server_info.bytes_sent++;
+      
       self.state = HANDSHAKE_SEC_RES;
+      setTimeout(self.onstatechange, 0, self.state);
       
     } else if (self.state == HANDSHAKE_SEC_RES) {
       
@@ -139,8 +173,10 @@ function Vnc(o) {
       
       self.log('Security Result:'+ sec_res);
       self.ws.send( $.base64Encode( num_to_u8(0) )); // Send client-init
+      self.server_info.bytes_sent++;
       
       self.state = HANDSHAKE_SRV_INIT;
+      setTimeout(self.onstatechange, 0, self.state);
       
     } else if (self.state == HANDSHAKE_SRV_INIT) {
       
@@ -178,105 +214,96 @@ function Vnc(o) {
       ctx.fillStyle = 'rgb(200,0,0)';
       ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
       
-      //fbur_poll(); // Start framebuffer polling
-      self.ws.send( $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 0) ));
-      
+      fbur_poll(0); // Start framebuffer polling
+            
       self.state = CONNECTED;
-      
-    } else if (self.state == CONNECTED) {
-      
-      // Find out what the server is sending us
-      if (msg_type == -1) {
-        msg_type  = u8_to_num(self.buffer[0]);
-      }
-      
-      // Handle what the server is sending us
-      
-      // 6.5.1 FramebufferUpdate
-      if (msg_type == 0) {
-                  
-        if (self.buffer.length>15) {
-          
-          // Number of rectangles
-          // Padding = 1 byte
-          if (num_r == -1) {
-            num_r   = u16_to_num(self.buffer[2], self.buffer[3]);
-            self.buffer  = self.buffer.slice(4, self.buffer.length);
-          }            
-                      
-          var rect = {
-            x: u16_to_num(self.buffer[0], self.buffer[1]),
-            y: u16_to_num(self.buffer[2], self.buffer[3]),
-            w: u16_to_num(self.buffer[4], self.buffer[5]),
-            h: u16_to_num(self.buffer[6], self.buffer[7]),              
-            rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
-          };
-          var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
-          self.log('<br />['+num_r+','+self.buffer.length+','+JSON.stringify(rect)+']');
-          // how much data?
-          
-          offset = self.buffer.length;            
-          
-          if (self.buffer.length >= rectangle_length+12) {
+      setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
             
-            self.log('draw '+num_r);
-            self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, self.buffer.slice(12, self.buffer.length), ctx);
-            
-            num_r -= 1; // decrement rectangle count
-                          
-            if (num_r == 0) { // no more rectangles
-              num_r = -1;
-              msg_type = -1;
-              buffer = '';
-              offset = 12;
-            } else {
-              buffer = self.buffer.slice(rectangle_length+12);
-              offset = 0;
-            }
-                          
-          }
-        }
+    } else if ((self.state == CONNECTED) && (msg_type == -1)) { // Determine the message type
       
-      // 6.5.2 SetColourMapEntries
-      // When the pixel format uses a “colour map”, this message tells the
-      // client that the specified pixel values should be mapped to the given
-      // RGB intensities.
-      //        
-      } else if (msg_type == 1) {
-        
-        msg_type = -1;
-        
-      // 6.5.3 Bell
-      // Ring a bell on the client if it has one.
-      // 1      u8        2   message-type
-      //
-      } else if (msg_type == 2) {
-        msg_type = -1;
-        
-      // 6.5.4 ServerCutText
-      // The server has new ISO 8859-1 (Latin-1) text in its cut buffer.
-      // 1      u8        3   message-type
-      // 3      _         _   padding
-      // 4      u32       _   length
-      // length u8 array  _   text
-      //
-      } else if (msg_type == 3) {
+      msg_type = u8_to_num(read(1));
+      process_buffer(); // Continue down the rabbit-hole, immediatly, dont wait for more data!
+    
+    // 6.5.1 FramebufferUpdate
+    } else if ((self.state == CONNECTED) &&
+               (msg_type == 0) &&
+               self.buffer.length > 15) { // Ensure that buffer has enough data for the message header
+              
+      // Number of rectangles      
+      if (num_r == -1) {
+        read(1); // eat the padding-byte
+        num_r = u16_to_num(read(1), read(1));
+        //self.buffer   = self.buffer.slice(4, self.buffer.length); // no reason to slice this...
+      }            
                   
-        buffer += received_msg;
-        var text_length = u32_to_num(received_msg[4],received_msg[5],received_msg[6],received_msg[7]);
-        cut_text = '';
+      var rect = {
+        x: u16_to_num(self.buffer[0], self.buffer[1]),
+        y: u16_to_num(self.buffer[2], self.buffer[3]),
+        w: u16_to_num(self.buffer[4], self.buffer[5]),
+        h: u16_to_num(self.buffer[6], self.buffer[7]),
+        rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
+      };
+      var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
+      self.log('[RECTS:'+num_r+',BL:'+self.buffer.length+',RL:'+rectangle_length+','+JSON.stringify(rect)+']');
+            
+      if (self.buffer.length >= rectangle_length+12) {
         
-        for(var i=8; i<buffer.length; i++) {
-          cut_text += buffer[i];
-        }
+        var cur_rect_raw = read(12);
         
-        self.log('[ServerCutText: '+text_length+' '+ cut_text+']')
-        if (buffer.length == (8+text_length)) {
-          buffer = '';
+        self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
+        
+        num_r -= 1; // decrement rectangle count
+                    // remove rectangle from buffer
+        
+        if (num_r == 0) { // no more rectangles
+          num_r = -1;
           msg_type = -1;
         }
+        
+        // Continue down the rabbit-hole, immediatly, dont wait for more data!
+        // we already got a bunch!
+        if (self.buffer.length > 0) {
+          process_buffer();
+        }
+        
       }
-              
+    
+    // 6.5.2 SetColourMapEntries
+    // When the pixel format uses a “colour map”, this message tells the
+    // client that the specified pixel values should be mapped to the given
+    // RGB intensities.
+    //        
+    } else if ((self.state == CONNECTED) && (msg_type == 1)) {      
+      msg_type = -1;
+      
+    // 6.5.3 Bell
+    // Ring a bell on the client if it has one.
+    // 1      u8        2   message-type
+    //
+    } else if ((self.state == CONNECTED) && (msg_type == 2)) {
+      msg_type = -1;
+      
+    // 6.5.4 ServerCutText
+    // The server has new ISO 8859-1 (Latin-1) text in its cut buffer.
+    // 1      u8        3   message-type
+    // 3      _         _   padding
+    // 4      u32       _   length
+    // length u8 array  _   text
+    //
+    } else if ((self.state == CONNECTED) && (msg_type == 3)) {
+                
+      var text_length = u32_to_num(read(1), read(1), read(1), read(1));
+      cut_text = '';
+      
+      for(var i=8; i<buffer.length; i++) {
+        cut_text += buffer[i];
+      }
+      
+      self.log('[ServerCutText: '+text_length+' '+ cut_text+']')
+      if (buffer.length == (8+text_length)) {
+        buffer = '';
+        msg_type = -1;
+      }
     }
     
     self.processing = false;
@@ -354,14 +381,15 @@ function Rfb() {
   // in-space operations instead calling getImageData...
     
     var r_buffer = ctx.getImageData(r_x, r_y, w, h);  // Get a rectangle buffer
+    var alpha_val = 255;
     
     for(var i=0; i<(w*h*4);i+=4) {                    // Map BGR to RGB
                     
         r_buffer.data[i]   = u8_to_num(pixel_array[i+2]);     // Update pixels...
         r_buffer.data[i+1] = u8_to_num(pixel_array[i+1]);
         r_buffer.data[i+2] = u8_to_num(pixel_array[i]);
-        r_buffer.data[i+3] = 255;                     // Ignore transparency...
-              
+        
+        r_buffer.data[i+3] = alpha_val;                     // Ignore transparency...
       
     }
     

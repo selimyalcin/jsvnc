@@ -19,6 +19,15 @@
     <div id="pin"     class="btn icon pin"      title="Controls whether the panel should be visible.">Pin</div>
     <div id="refresh" class="btn icon refresh"  title="Request a full display update.">Refresh</div>
     <div id="scale"   class="btn icon scale"    title="Scale the display to fit in the current window.">Scale</div>
+
+    <div class="info icon log">  
+      <fieldset>    
+      <pre id="log"></pre>
+      </fieldset>
+      
+      <span>Log</span>
+    </div>
+    &nbsp;  
     
     <div id="con_status" class="info icon">
       
@@ -50,14 +59,7 @@
       
       <span>Unknown</span>
     </div>
-  
-    <div class="info icon log">  
-      <fieldset>    
-      <pre id="log"></pre>
-      </fieldset>
-      
-      <span>Log</span>
-    </div>
+
     &nbsp;  
     <div id="disconnect"  title="Close the current connection."   class="btn icon disconnect" >Disconnect</div>
       
@@ -75,7 +77,7 @@
           <tr>
             <td>WS Host/Port</td>
             <td><input id="ws_host" class="host" type="text" name="ws_host" value="mifcho.safl.dk" />
-               / <input id="ws_port" type="text" class="port" name="ws_port" value="8080" />
+               / <input id="ws_port" type="text" class="port" name="ws_port" value="8000" />
             </td>
           </tr>
           <tr><td colspan="2"><div id="connect" class="btn icon connect">Connect</div></td></tr>
@@ -94,9 +96,28 @@
 
 $(document).ready(function(){
   
-  var vnc = new Vnc({vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
-                     ws_host: $('#ws_host').val(), ws_port: $('#ws_port').val()});
+  var vnc = new Vnc({ vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
+                      ws_host: $('#ws_host').val(),   ws_port: $('#ws_port').val()});
   vnc.connect();
+  vnc.onstatechange = function (state) {
+    
+    if ((state > 0) && (state < 100)) {
+      $('#con_status > span').html('Connecting');
+      $('#con_status').removeClass('disconnected').addClass('connected');
+    } else if ((state >= 100) && (state <200)) {
+      $('#con_status > span').html('Handshaking');
+      $('#con_status').removeClass('disconnected').addClass('connected');
+    } else if ((state >= 200) && (state < 300)) {
+      $('#con_status > span').html('Connected');
+      $('#con_status').removeClass('disconnected').addClass('connected');
+    } else if (state == 300) {
+      $('#con_status > span').html('Disconnected');
+      $('#con_status').removeClass('connected').addClass('disconnected');
+    } else {
+      $('#con_status > span').html('Unknown');
+    }
+    
+  }
   
 });
 
