@@ -44,7 +44,9 @@ function Vnc(o) {
   var CONNECTED           = 200;
   var CONNECTED_RECV_FB   = 210;
   var DISCONNECTED  = 300;
-    
+  
+  var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
+  
   self.state  = DISCONNECTED;
   
   // Framebuffer dimensions, servername and some other stuff
@@ -58,6 +60,8 @@ function Vnc(o) {
   var ctx; // Initialized during handshake
   var msg_type = -1;
   var num_r = -1;
+  var cur_r = 0;
+  var rect = { x: 0, y: 0, w: 0, h: 0, rect_encoding: -1000 };
   
   self.buffer = '';
   self.processing = false;
@@ -89,7 +93,7 @@ function Vnc(o) {
       
       self.bytes_recv += event.data.length;
       self.buffer += $.base64Decode( event.data );
-      self.log('['+self.processing+','+self.buffer.length+']');
+      self.log('['+self.buffer.length+']');
             
       if (!self.processing) {
         process_buffer(); 
@@ -101,6 +105,20 @@ function Vnc(o) {
   }
   
   self.onstatechange = function () { };
+  
+  function mouse_handler(event) {
+    
+    // Handling the mouse      
+    // Grab cursor "desktop-coordinates"
+    var offset = $(this).offset()
+    var cursor_x, cursor_y = 0;
+    cursor_x = event.pageX - offset.left;
+    cursor_y = event.pageY - offset.top;
+    
+    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, 1) ));
+    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, 0) ));        
+    
+  }
   
   // A non-blocking read call. It will attempt and read bytes
   function read(size) {
@@ -119,11 +137,11 @@ function Vnc(o) {
   function fbur_poll(poll_count) {
     
     // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
-    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, (poll_count % 10)) );
+    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, (poll_count % 120)) );
     self.ws.send( msg );
     self.server_info.bytes_sent += msg.length;
     
-    setTimeout(fbur_poll, 1000, ++poll_count);
+    setTimeout(fbur_poll, 500, ++poll_count);
   }
   
   var sec_types = new Array();
@@ -210,9 +228,16 @@ function Vnc(o) {
       ctx = document.getElementById(self.ctx_id).getContext('2d');
       self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
       
+      // Set a mouse-handler on the canvas
+      $('#'+self.ctx_id).click(mouse_handler);
+      
       ctx.putImageData(self.server_info.data, 0, 0);
       ctx.fillStyle = 'rgb(200,0,0)';
       ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+      
+      // Inform server of supported encodings
+      //var enc_msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
+      //self.ws.send( enc_msg );
       
       fbur_poll(0); // Start framebuffer polling
             
@@ -227,33 +252,58 @@ function Vnc(o) {
     // 6.5.1 FramebufferUpdate
     } else if ((self.state == CONNECTED) &&
                (msg_type == 0) &&
-               self.buffer.length > 15) { // Ensure that buffer has enough data for the message header
+               self.buffer.length >= 15) { // Ensure that buffer has enough data for the message header
               
       // Number of rectangles      
       if (num_r == -1) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
-        //self.buffer   = self.buffer.slice(4, self.buffer.length); // no reason to slice this...
-      }            
-                  
-      var rect = {
+        self.log('[RECTS:'+num_r+']');
+                
+      }
+      
+      rect = {
         x: u16_to_num(self.buffer[0], self.buffer[1]),
         y: u16_to_num(self.buffer[2], self.buffer[3]),
         w: u16_to_num(self.buffer[4], self.buffer[5]),
         h: u16_to_num(self.buffer[6], self.buffer[7]),
         rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
       };
-      var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
-      self.log('[RECTS:'+num_r+',BL:'+self.buffer.length+',RL:'+rectangle_length+','+JSON.stringify(rect)+']');
-            
+      self.log(JSON.stringify(rect));
+      var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);        
+                   
+      // RAW encoding
+      if (rect.rect_encoding == 0) {
+        self.log('NICE AND RAW!');        
+      // CopyRect
+      } else if (rect.rect_encoding == 1) {
+        self.log('UNSUPPORTED Encoding');
+      // RRE
+      } else if (rect.rect_encoding == 2) {
+        self.log('UNSUPPORTED Encoding');
+      // Hextile
+      } else if (rect.rect_encoding == 5) {
+        self.log('UNSUPPORTED Encoding');
+      // ZRLE
+      } else if (rect.rect_encoding == 16) {
+        self.log('UNSUPPORTED Encoding');
+      // Pseudo-encoding: Cursor
+      } else if (rect.rect_encoding == -239) {
+        self.log('UNSUPPORTED Encoding');
+      // pseudo-encoding: DesktopSize
+      } else if (rect.rect_encoding == -223) {
+        self.log('UNSUPPORTED Encoding');
+      } else {
+        self.log('UNKOWN Encoding');
+      }
+      
       if (self.buffer.length >= rectangle_length+12) {
-        
-        var cur_rect_raw = read(12);
-        
+      
+        var cur_rect_raw = read(12);          
         self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
         
-        num_r -= 1; // decrement rectangle count
-                    // remove rectangle from buffer
+        num_r -= 1;       // decrement rectangle count
+                          // remove rectangle from buffer
         
         if (num_r == 0) { // no more rectangles
           num_r = -1;
@@ -273,7 +323,8 @@ function Vnc(o) {
     // client that the specified pixel values should be mapped to the given
     // RGB intensities.
     //        
-    } else if ((self.state == CONNECTED) && (msg_type == 1)) {      
+    } else if ((self.state == CONNECTED) && (msg_type == 1)) {
+      self.log('SET COLOR-MAP.... dammit...');
       msg_type = -1;
       
     // 6.5.3 Bell
@@ -281,6 +332,7 @@ function Vnc(o) {
     // 1      u8        2   message-type
     //
     } else if ((self.state == CONNECTED) && (msg_type == 2)) {
+      self.log('RING MY BELL!');
       msg_type = -1;
       
     // 6.5.4 ServerCutText
@@ -291,7 +343,9 @@ function Vnc(o) {
     // length u8 array  _   text
     //
     } else if ((self.state == CONNECTED) && (msg_type == 3)) {
-                
+      
+      self.log('Server, CUT TEXT');
+      
       var text_length = u32_to_num(read(1), read(1), read(1), read(1));
       cut_text = '';
       
@@ -320,9 +374,31 @@ function Vnc(o) {
 function Rfb() {
 
   // Client to server messages
+  this.std_encodings = [0, 1, 2, 5, 16, -239, -223];
+  
+  // 6.4.1 - SetPixelFormat
+  // todo: implement...
+  this.setPixelFormat = function() {
+    return '';
+  }
+  
+  // 6.4.2 - SetEncodings
+  this.setEncodings = function(encodings) {
+    
+    var r = num_to_u8(2);   // message-type
+        r += num_to_u8(1);  // padding
+        r += num_to_u16(encodings.length);
+        
+    for(var i=0; i<encodings.length; i++) {
+      r += num_to_u32(encodings[i]);
+    }
+    
+    return r;
+    
+  }
   
   // 6.4.3 - FramebufferUpdateRequest
-  this.fbur = function (w, h, inc) {
+  this.fbur = function(w, h, inc) {
     
     var r =   num_to_u8(3);
         r +=  num_to_u8(inc);
