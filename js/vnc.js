@@ -77,6 +77,7 @@ function Vnc(o) {
     setTimeout(self.onstatechange, 0, self.state);
 
     self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/tun:hobs/host:'+self.vnc_host+'/port:'+self.vnc_port+'/');
+    //self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);
     
     self.ws.onopen = function() {
       self.state = HANDSHAKE;
@@ -196,9 +197,10 @@ function Vnc(o) {
       self.state = HANDSHAKE_SRV_INIT;
       setTimeout(self.onstatechange, 0, self.state);
       
-    } else if (self.state == HANDSHAKE_SRV_INIT) {
+    } else if ((self.state == HANDSHAKE_SRV_INIT) && (self.buffer.length >= 24)) {
       
-      var srv_init_buf = read(24);
+      //var srv_init_buf = read(24);
+      var srv_init_buf = self.buffer.slice(0, 24);
       var name_len = 0;
       
       self.server_info.width  = u16_to_num(srv_init_buf[0], srv_init_buf[1]);
@@ -217,43 +219,52 @@ function Vnc(o) {
       self.server_info.green_shift  = u8_to_num(srv_init_buf[15]);
       self.server_info.blue_shift   = u8_to_num(srv_init_buf[16]);
       
-      name_len = u32_to_num(srv_init_buf[20], srv_init_buf[21], srv_init_buf[22] ,srv_init_buf[23] );      
-      self.server_info.name = read(name_len);
+      name_len = u32_to_num(srv_init_buf[20], srv_init_buf[21], srv_init_buf[22] ,srv_init_buf[23] );
       
-      self.log(+name_len+', '+self.server_info.name);
-      self.log(JSON.stringify(self.server_info));
+      if (self.buffer.length >= 24+name_len) {
       
-      // Initialize the canvas context
-      document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
-      ctx = document.getElementById(self.ctx_id).getContext('2d');
-      self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
-      
-      // Set a mouse-handler on the canvas
-      $('#'+self.ctx_id).click(mouse_handler);
-      
-      ctx.putImageData(self.server_info.data, 0, 0);
-      ctx.fillStyle = 'rgb(200,0,0)';
-      ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
-      
-      // Inform server of supported encodings
-      //var enc_msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
-      //self.ws.send( enc_msg );
-      
-      fbur_poll(0); // Start framebuffer polling
-            
-      self.state = CONNECTED;
-      setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
+        read(24);
+        self.server_info.name = read(name_len);
+        
+        self.log('HNL='+name_len+', '+self.server_info.name);
+        self.log(JSON.stringify(self.server_info));
+        
+        // Initialize the canvas context
+        document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
+        ctx = document.getElementById(self.ctx_id).getContext('2d');
+        self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
+        
+        // Set a mouse-handler on the canvas
+        $('#'+self.ctx_id).click(mouse_handler);
+        
+        ctx.putImageData(self.server_info.data, 0, 0);
+        ctx.fillStyle = 'rgb(200,0,0)';
+        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+        
+        // Inform server of supported encodings
+        //var enc_msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
+        //self.ws.send( enc_msg );
+        
+        fbur_poll(0); // Start framebuffer polling
+              
+        self.state = CONNECTED;
+        setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
+        
+      }
             
     } else if ((self.state == CONNECTED) && (msg_type == -1)) { // Determine the message type
       
+      self.log('BS:'+self.buffer.length);
       msg_type = u8_to_num(read(1));
+      self.log('MSG-TYPE:'+msg_type);
+      self.log('BS:'+self.buffer.length);
       process_buffer(); // Continue down the rabbit-hole, immediatly, dont wait for more data!
     
     // 6.5.1 FramebufferUpdate
     } else if ((self.state == CONNECTED) &&
                (msg_type == 0) &&
                self.buffer.length >= 15) { // Ensure that buffer has enough data for the message header
-              
+      
       // Number of rectangles      
       if (num_r == -1) {
         read(1); // eat the padding-byte
