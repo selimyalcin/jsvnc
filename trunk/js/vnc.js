@@ -5,7 +5,7 @@
  Interface:
  
  vnc.connect()
- vnc.disconnect
+ vnc.disconnect()
  
  vnc.server_info
  vnc.state
@@ -70,7 +70,7 @@ function Vnc(o) {
   for (param in o) { self[param] = o[param]; }
     
   // Wrap around communication library
-  self.disconnect = function () { self.ws.disconnect(); };
+  self.disconnect = function () { self.ws.close(); };
   self.connect    = function () {
     
     self.state = CONNECTING;
@@ -102,24 +102,52 @@ function Vnc(o) {
 
     }
     
-    self.disconnect = function () { self.ws.disconnect(); };
   }
   
   self.onstatechange = function () { };
   
   function mouse_handler(event) {
+
+    var offset = $('#'+self.ctx_id).offset() // Position of the canvas element relative to the document
+    var cursor_x, cursor_y = 0;   
     
-    // Handling the mouse      
-    // Grab cursor "desktop-coordinates"
-    var offset = $(this).offset()
-    var cursor_x, cursor_y = 0;
-    cursor_x = event.pageX - offset.left;
-    cursor_y = event.pageY - offset.top;
+    // TODO: Fix coordinates according to scale
+    if (self.server_info.scaled == 1) {
+      cursor_x = event.pageX - offset.left;
+      cursor_y = event.pageY - offset.top;  
+    } else {
+      cursor_x = event.pageX - offset.left;
+      cursor_y = event.pageY - offset.top;  
+    }
     
-    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, 1) ));
-    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, 0) ));        
+    var pressed = true;
+    if (event.type == 'mouseup') {
+      pressed = false;      
+    }
+    self.log('[BPRESS: '+event.type+','+offset.top+','+offset.left+','+pressed+','+event.which+','+event.pageX+','+event.pageY+']');
+    
+    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, pressed, event.which) ));
     
   }
+  
+  // Transform key-strokes to keyEvents..
+  function key_handler(event) {
+        
+    var pressed = true;
+    var key_sym = event.which;
+    
+    if (key_sym in self.rfb.key_map) {
+      key_sym = self.rfb.key_map[key_sym];
+    }
+    if (event.type == 'keyup') {
+      pressed = false;
+    }
+    
+    log('[KEYEVENT: '+event.type+': '+event.which+','+String.fromCharCode(event.which)+']');    
+    
+    self.ws.send( $.base64Encode( self.rfb.keyEvent(key_sym, pressed) ));
+    
+  }  
   
   // A non-blocking read call. It will attempt and read bytes
   function read(size) {
@@ -234,8 +262,12 @@ function Vnc(o) {
         ctx = document.getElementById(self.ctx_id).getContext('2d');
         self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
         
-        // Set a mouse-handler on the canvas
-        $('#'+self.ctx_id).click(mouse_handler);
+        window.oncontextmenu = function () { return false; }
+        $(window).mousedown(function (event) { mouse_handler(event);});
+        $(window).mouseup(function (event) {   mouse_handler(event);});
+        
+        $(window).keydown(function (event) { key_handler(event);  });
+        $(window).keyup(function (event) {   key_handler(event);  });
         
         ctx.putImageData(self.server_info.data, 0, 0);
         ctx.fillStyle = 'rgb(200,0,0)';
@@ -379,6 +411,12 @@ function Vnc(o) {
   self.dump = function() {
     self.log(JSON.stringify(self));
   }
+  
+  self.refresh = function() {
+    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 1) );
+    self.ws.send( msg );
+    self.server_info.bytes_sent += msg.length;
+  }
 
 }
 
@@ -386,6 +424,43 @@ function Rfb() {
 
   // Client to server messages
   this.std_encodings = [0, 1, 2, 5, 16, -239, -223];
+  
+  this.key_map = {8: 0xff08,  // Backspace
+                  9: 0xff09,  // Tab
+                  13: 0xff0d, // Return / Enter
+                  27: 0xff1b, // Escape
+                  45: 0xff63, // Insert
+                  46: 0xffff, // Delete
+                  36: 0xff50,   // Home
+                  35: 0xff57,    // End
+                  33: 0xff55,    // Page Up
+                  34: 0xff56,  // Page Down
+                  37: 0xff51,   // Left
+                  38: 0xff52,     // Up
+                  39: 0xff53,  // Right
+                  40: 0xff54,   // Down
+                  112: 0xffbe,     // F1
+                  113: 0xffbf,     // F2
+                  113: 0xffc0,     // ...
+                  114: 0xffc1,
+                  115: 0xffc2,
+                  116: 0xffc3,
+                  117: 0xffc4,
+                  118: 0xffc5,
+                  119: 0xffc6,
+                  120: 0xffc7,
+                  121: 0xffc8,     // ...
+                  122: 0xffc9,    // F12
+                  16: 0xffe1, // Shift Left
+                  'shiftr': 0xffe2, // Shift right
+                  17: 0xffe3,  // Ctrl Left
+                  'ctrlr': 0xffe4,  // Ctrl Right
+                  'metal': 0xffe7,  // Meta Left
+                  'metar': 0xffe8,  // Meta Right
+                  18: 0xffe9,   // Alt Left
+                  'altr': 0xffea};  // Alt Right
+  
+  this.button_map = {1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64, 8:128};
   
   // 6.4.1 - SetPixelFormat
   // todo: implement...
@@ -433,10 +508,15 @@ function Rfb() {
   }
   
   // 6.4.5 - PointerEvent
-  this.pointerEvent = function(x, y, pressed) {
-      
+  this.pointerEvent = function(x, y, pressed, button) {
+    
+    var button_mask = 0;
+    if (pressed) {
+      button_mask = this.button_map[button];
+    }
+    
     var r =   num_to_u8(5);
-        r +=  num_to_u8(pressed);
+        r +=  num_to_u8(button_mask);
         r +=  num_to_u16(x);
         r +=  num_to_u16(y);
     

@@ -5,7 +5,6 @@
 <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" /> 
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/jquery.base64.js"></script>
-<script type="text/javascript" src="js/base64.js"></script>
 <script type="text/javascript" src="js/socket.js"></script>
 <script type="text/javascript" src="js/hobs.js"></script>
 <script type="text/javascript" src="js/vnc.js"></script>
@@ -96,6 +95,13 @@
 
 $(document).ready(function(){
   
+  var gui = {'scaled': 0,
+              'pinned': 1,
+              'log': function (msg) {
+                document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';  
+              }
+            };
+    
   var vnc = new Vnc({ vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
                       ws_host: $('#ws_host').val(),   ws_port: $('#ws_port').val()});
   vnc.connect();
@@ -110,6 +116,63 @@ $(document).ready(function(){
     } else if ((state >= 200) && (state < 300)) {
       $('#con_status > span').html('Connected');
       $('#con_status').removeClass('disconnected').addClass('connected');
+      
+      /* GUI buttons */
+  
+      // Pin click
+      $('#pin').click(function (event) {
+
+        gui['pinned'] = gui['pinned']^1;
+
+        gui.log('['+$(window).width()+','+$(window).height()+']');
+        gui.log('['+$(document).width()+','+$(document).height()+']');
+        
+        if ($('#panel').hasClass('unpinned')) {
+          $('#panel').removeClass('unpinned');
+          $('#panel').removeClass('hidden');
+          $('#pin').removeClass('unpin').addClass('pin');
+        } else {
+          $('#panel').addClass('unpinned');
+          $('#panel').addClass('hidden');
+          $('#pin').removeClass('pin').addClass('unpin');
+        }
+        
+      });
+      
+      // Refresh click
+      $('#refresh').click(function (event) {    
+        vnc.refresh();
+      });
+      
+      // Scale click
+      $('#scale').click(function () {
+              
+        var w = 0;
+        var h = 0;
+        
+        // Toggle scaling
+        gui['scaled'] = gui['scaled']^1;
+        
+        // Determine width and height
+        if (gui['scaled'] == 1) {
+          w = $(window).width();      
+          h = $(window).height();
+        } else {
+          w = vnc.server_info.width;
+          h = vnc.server_info.height
+        }
+        
+        // Do scaling
+        $('#frame_container canvas').width(w);
+        $('#frame_container canvas').height(h);
+        
+      });
+      
+      // Disconnect click
+      $('#disconnect').click(function () {
+        vnc.disconnect();
+      });
+      
     } else if (state == 300) {
       $('#con_status > span').html('Disconnected');
       $('#con_status').removeClass('connected').addClass('disconnected');
