@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+<title>jsVNC</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" /> 
+<script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/jquery.base64.js"></script>
+<script type="text/javascript" src="js/socket.js"></script>
+<script type="text/javascript" src="js/hobs.js"></script>
+<script type="text/javascript" src="js/vnc.js"></script>
+<link rel="stylesheet" type="text/css" href="css/basic.css" media="screen" /> 
+</head>
+<body>
+<p>&nbsp;</p>
+
+<pre id="log" style="text-align: left; width: 800px; height: 300px; overflow: scroll;"></pre>
+
+<center>
+<div id="fb" style="width: 800px; height: 600px; background-color: gray;">sdf</div>
+</center>
+
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+
+  var gui =  {'scaled': 0,
+              'pinned': 1,
+              'log': function (msg) {
+                document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n' +document.getElementById("log").innerHTML;
+              }
+            };
+  key_map = {8: 0xff08, 9: 0xff09, 13: 0xff0d, 27: 0xff1b, 45: 0xff63};
+  
+  if (8 in key_map) {
+    gui.log('jep it is there!'+key_map[8]);
+  }
+  
+  function mouse_handler(event) {
+  
+    var offset = $('#fb').offset() // Position of the canvas element relative to the document
+    var cursor_x, cursor_y = 0;   
+    cursor_x = event.pageX - offset.left;
+    cursor_y = event.pageY - offset.top;
+    
+    var pressed = true;
+    if (event.type == 'mouseup') {
+      pressed = false;      
+    }
+    gui.log('[BPRESS: '+event.type+','+offset.top+','+offset.left+','+pressed+','+event.which+','+event.pageX+','+event.pageY+']');
+  
+  }
+  
+  function key_handler(event) {
+        
+    var pressed = true;
+    if (event.type == 'keyup') {
+      pressed = false;
+    }
+    
+    gui.log('['+event.type+': '+event.which+','+String.fromCharCode(event.which)+']');
+    ws.send( $.base64Encode( keyEvent(event.which, pressed)));
+    
+  }
+  
+  window.oncontextmenu = function () { return false; }
+  $(window).mousedown(function (event) { mouse_handler(event);});
+  $(window).mouseup(function (event) {   mouse_handler(event);});
+  
+  $(document).keyup(function (event) { key_handler(event); } );
+  $(document).keydown(function (event) { key_handler(event); } );
+  
+  
+  
+});
+
+</script>
+
+</body>
+</html>
+
