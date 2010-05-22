@@ -123,9 +123,6 @@ $(document).ready(function(){
       $('#pin').click(function (event) {
 
         gui['pinned'] = gui['pinned']^1;
-
-        gui.log('['+$(window).width()+','+$(window).height()+']');
-        gui.log('['+$(document).width()+','+$(document).height()+']');
         
         if ($('#panel').hasClass('unpinned')) {
           $('#panel').removeClass('unpinned');
