@@ -16,17 +16,17 @@ function Vnc(o) {
   
   // Default values
   if( !o ) o = {};
-  if( o.vnc_host == undefined ) o.vnc_host = 'wstest.local';
-  if( o.vnc_port == undefined ) o.vnc_port = '5900';
+  if( o.vnc_host == undefined ) o.vnc_host = 'jsvnc-01';
+  if( o.vnc_port == undefined ) o.vnc_port = '59000';
   
-  if( o.ws_host == undefined ) o.ws_host = 'wstest.local';
+  if( o.ws_host == undefined ) o.ws_host = 'jsvnc-01';
   if( o.ws_port == undefined ) o.ws_port = '8000';
     
   if( o.agent == undefined ) o.agent = 'ANY'; // Mifcho overlay agent
   
   // GUI bindings
   if( o.log == undefined ) o.log = function (msg) {
-    document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';
+    document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n' +document.getElementById("log").innerHTML;
   }
   if (o.ctx_id == undefined ) o.ctx_id = 'vnc_canvas';
   if (o.fc_id == undefined ) o.fc_id = 'frame_container';
@@ -46,7 +46,7 @@ function Vnc(o) {
   var DISCONNECTED  = 300;
   
   //var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
-  var ENCODINGS = [0, 1]; // RAW, copy-rect
+  var ENCODINGS = [0, 1, -223]; // RAW, copy-rect, pseudo-desktop-size
   
   self.state  = DISCONNECTED;
   
@@ -113,7 +113,7 @@ function Vnc(o) {
       
       self.bytes_recv += event.data.length;
       self.buffer += $.base64Decode( event.data );
-      self.log('['+self.buffer.length+']');
+      self.log('Buffer-Length: '+self.buffer.length);
             
       if (!self.processing) {
         process_buffer(); 
@@ -143,7 +143,6 @@ function Vnc(o) {
     if (event.type == 'mouseup') {
       pressed = false;      
     }
-    self.log('[BPRESS: '+event.type+','+offset.top+','+offset.left+','+pressed+','+event.which+','+event.pageX+','+event.pageY+']');
     
     self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, pressed, event.which) ));
     
@@ -155,14 +154,16 @@ function Vnc(o) {
     var pressed = true;
     var key_sym = event.which;
     
-    if (key_sym in self.rfb.key_map) {
-      key_sym = self.rfb.key_map[key_sym];
+    if (event.which in self.rfb.key_map) {
+      key_sym = self.rfb.key_map[event.which];
+    } else {
+      key_sym = String.fromCharCode(event.which).toLowerCase().charCodeAt(0);
     }
     if (event.type == 'keyup') {
       pressed = false;
     }
     
-    log('[KEYEVENT: '+event.type+': '+event.which+','+String.fromCharCode(event.which)+']');    
+    self.log('[KEYEVENT: '+event.type+': '+event.which+','+String.fromCharCode(event.which)+']');    
     
     self.ws.send( $.base64Encode( self.rfb.keyEvent(key_sym, pressed) ));
     
@@ -223,7 +224,7 @@ function Vnc(o) {
         // Connection failed
         // TODO: handle a failde connection attempt!
       }
-      self.log('Security types:' +num_sec+','+ JSON.stringify(sec_types));
+      //self.log('Security types:' +num_sec+','+ JSON.stringify(sec_types));
       self.ws.send( $.base64Encode( num_to_u8(1)) ); // Select sec-type None
       self.server_info.bytes_sent++;
       
@@ -238,7 +239,7 @@ function Vnc(o) {
         // TODO: Handle a failed security response        
       }
       
-      self.log('Security Result:'+ sec_res);
+      //self.log('Security Result:'+ sec_res);
       self.ws.send( $.base64Encode( num_to_u8(0) )); // Send client-init
       self.server_info.bytes_sent++;
       
@@ -273,35 +274,29 @@ function Vnc(o) {
       
         read(24);
         self.server_info.name = read(name_len);
-        
-        self.log('HNL='+name_len+', '+self.server_info.name);
-        self.log(JSON.stringify(self.server_info));
-        
+                
         // Initialize the canvas context
         document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
         ctx = document.getElementById(self.ctx_id).getContext('2d');
         self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
         
+        ctx.putImageData(self.server_info.data, 0, 0);
+        ctx.fillStyle = 'rgb(200,0,0)';
+        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+        
+        // Listen for mouse+keyboard input
         window.oncontextmenu = function () { return false; }
         $(window).mousedown(function (event) { mouse_handler(event);});
         $(window).mouseup(function (event) {   mouse_handler(event);});
         
         $(window).keydown(function (event) { key_handler(event);  });
         $(window).keyup(function (event) {   key_handler(event);  });
-        
-        ctx.putImageData(self.server_info.data, 0, 0);
-        ctx.fillStyle = 'rgb(200,0,0)';
-        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
-        
-        // Inform server of supported encodings
-        //var enc_msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
-        //self.ws.send( enc_msg );
-        
-        // setPixelFormat
-        // setEncodings
+                
+        // setPixelFormat        
         var msg = $.base64Encode( self.rfb.setPixelFormat(self.server_info) );
         self.ws.send( msg );
         
+        // setEncodings
         msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
         self.ws.send( msg );
         
@@ -315,10 +310,7 @@ function Vnc(o) {
             
     } else if ((self.state == CONNECTED) && (msg_type == -1)) { // Determine the message type
       
-      self.log('BS:'+self.buffer.length);
       msg_type = u8_to_num(read(1));
-      self.log('MSG-TYPE:'+msg_type);
-      self.log('BS:'+self.buffer.length);
       process_buffer(); // Continue down the rabbit-hole, immediatly, dont wait for more data!
     
     // 6.5.1 FramebufferUpdate
@@ -330,8 +322,7 @@ function Vnc(o) {
       if (num_r == -1) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
-        self.log('[RECTS:'+num_r+']');
-                
+        self.log('Rectangles: '+num_r);                
       }
       
       rect = {
@@ -341,11 +332,12 @@ function Vnc(o) {
         h: u16_to_num(self.buffer[6], self.buffer[7]),
         rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
       };
-      self.log(JSON.stringify(rect));
+      
+      self.log('Rectangle: '+JSON.stringify(rect));
       
       // RAW encoding
       if (rect.rect_encoding == 0) {
-        self.log('NICE AND RAW!');
+        self.log('RAW Encoding!');
         
         var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
         if (self.buffer.length >= rectangle_length+12) {
@@ -396,19 +388,58 @@ function Vnc(o) {
         
       // RRE
       } else if (rect.rect_encoding == 2) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('RRE - UNSUPPORTED Encoding');
+        
       // Hextile
       } else if (rect.rect_encoding == 5) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('Hextile - UNSUPPORTED Encoding');
+        
       // ZRLE
       } else if (rect.rect_encoding == 16) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('ZRLE - UNSUPPORTED Encoding');
+        
       // Pseudo-encoding: Cursor
       } else if (rect.rect_encoding == -239) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('Pseudo-Cursor UNSUPPORTED Encoding');
+        
       // pseudo-encoding: DesktopSize
       } else if (rect.rect_encoding == -223) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('Desktop-Size');
+        
+        // Adjust the desktop-size!
+        read(12);
+        
+        self.server_info.width   = rect.w;
+        self.server_info.height  = rect.h;
+                
+        // Re-Initialize the canvas context
+        $('#'+self.ctx_id).remove();
+        document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
+        ctx = document.getElementById(self.ctx_id).getContext('2d');
+        self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
+        
+        ctx.putImageData(self.server_info.data, 0, 0);
+        ctx.fillStyle = 'rgb(200,0,0)';
+        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+        
+        //$('#'+self.ctx_id).width(rect.w);
+        //$('#'+self.ctx_id).height(rect.h);
+        //
+        //ctx.fillRect(0,0, rect.w, rect.h);
+        self.log('RESIZE TO: '+rect.w+', '+rect.h);
+        
+        num_r -= 1;
+        if (num_r == 0) { // no more rectangles
+          num_r = -1;
+          msg_type = -1;
+        }
+        
+        // Continue down the rabbit-hole, immediatly, dont wait for more data!
+        // we already got a bunch!
+        if (self.buffer.length > 0) {
+          process_buffer();
+        }
+        
       } else {
         self.log('UNKOWN Encoding');
       }
@@ -439,10 +470,8 @@ function Vnc(o) {
     //
     } else if ((self.state == CONNECTED) && (msg_type == 3)) {
       
-      self.log('CUT TEXT 0');
       if (self.buffer.length >= 7) {
         
-        self.log('CUT TEXT 1');
         var text_length = u32_to_num(self.buffer[3],
                                      self.buffer[4],
                                      self.buffer[5],
@@ -454,7 +483,7 @@ function Vnc(o) {
             cut_text += self.buffer[7+i];
           }
           
-          self.log('CUT TEXT 4: '+text_length+' '+ cut_text);
+          self.log('Server CutText: ['+ cut_text+']');
           read(7+text_length);        
           msg_type = -1;
         }
