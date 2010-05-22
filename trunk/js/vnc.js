@@ -45,7 +45,8 @@ function Vnc(o) {
   var CONNECTED_RECV_FB   = 210;
   var DISCONNECTED  = 300;
   
-  var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
+  //var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
+  var ENCODINGS = [0, 1]; // RAW, copy-rect
   
   self.state  = DISCONNECTED;
   
@@ -56,7 +57,19 @@ function Vnc(o) {
                       red_shift:  0,  green_shift:  0,  blue_shift: 0,
                       name:       '', scaled:       0,  ver: '',
                       bytes_sent:0, bytes_recv:0};
-                      
+  
+  function pixel_format(bpp, depth, big_endian, true_color,
+                        red_max, green_max, blue_max,
+                        red_shift, green_shift, blue_shift) {
+    
+    return {bpp: bpp, depth:depth,
+            big_endian:big_endian, true_color:true_color,
+            red_max:red_max, green_max:green_max, blue_max:blue_max,
+            red_shift:red_shift, green_shift:green_shift, blue_shift:blue_shift
+            };
+    
+  }
+  
   var ctx; // Initialized during handshake
   var msg_type = -1;
   var num_r = -1;
@@ -76,8 +89,14 @@ function Vnc(o) {
     self.state = CONNECTING;
     setTimeout(self.onstatechange, 0, self.state);
 
-    self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/tun:hobs/host:'+self.vnc_host+'/port:'+self.vnc_port+'/');
-    //self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);
+    //if ("WebSocket" in window) {
+    if (false) {
+      self.log('Using Websocket transport.');
+      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);      
+    } else {
+      self.log('Using Hobs transport.');
+      self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);  
+    }
     
     self.ws.onopen = function() {
       self.state = HANDSHAKE;
@@ -167,10 +186,11 @@ function Vnc(o) {
     
     // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
     var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, (poll_count % 120)) );
+
     self.ws.send( msg );
     self.server_info.bytes_sent += msg.length;
     
-    setTimeout(fbur_poll, 500, ++poll_count);
+    setTimeout(fbur_poll, 1000, ++poll_count);
   }
   
   var sec_types = new Array();
@@ -277,6 +297,15 @@ function Vnc(o) {
         //var enc_msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
         //self.ws.send( enc_msg );
         
+        // setPixelFormat
+        // setEncodings
+        var msg = $.base64Encode( self.rfb.setPixelFormat(self.server_info) );
+        self.ws.send( msg );
+        
+        msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
+        self.ws.send( msg );
+        
+        
         fbur_poll(0); // Start framebuffer polling
               
         self.state = CONNECTED;
@@ -313,14 +342,58 @@ function Vnc(o) {
         rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
       };
       self.log(JSON.stringify(rect));
-      var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);        
-                   
+      
       // RAW encoding
       if (rect.rect_encoding == 0) {
-        self.log('NICE AND RAW!');        
+        self.log('NICE AND RAW!');
+        
+        var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
+        if (self.buffer.length >= rectangle_length+12) {
+        
+          var cur_rect_raw = read(12);
+          self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
+          
+          num_r -= 1;       // decrement rectangle count
+                            // remove rectangle from buffer
+          
+          if (num_r == 0) { // no more rectangles
+            num_r = -1;
+            msg_type = -1;
+          }
+          
+          // Continue down the rabbit-hole, immediatly, dont wait for more data!
+          // we already got a bunch!
+          if (self.buffer.length > 0) {
+            process_buffer();
+          }
+          
+        }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        self.log('UNSUPPORTED Encoding');
+        self.log('COPY-RECT Encoding');
+        
+        if (self.buffer.length >= 12+4) {
+          var cur_rect_raw = read(12);
+          var src_x = u16_to_num(read(1), read(1));
+          var src_y = u16_to_num(read(1), read(1));
+          self.log('[CR '+src_x+','+src_y+']')
+          
+          var copied_rect = ctx.getImageData(src_x, src_y, rect.w, rect.h);  // Get a rectangle buffer
+          ctx.putImageData(copied_rect, rect.x, rect.y);
+          
+          num_r -= 1;
+          if (num_r == 0) { // no more rectangles
+            num_r = -1;
+            msg_type = -1;
+          }
+          
+          // Continue down the rabbit-hole, immediatly, dont wait for more data!
+          // we already got a bunch!
+          if (self.buffer.length > 0) {
+            process_buffer();
+          }
+        }
+        
       // RRE
       } else if (rect.rect_encoding == 2) {
         self.log('UNSUPPORTED Encoding');
@@ -340,27 +413,6 @@ function Vnc(o) {
         self.log('UNKOWN Encoding');
       }
       
-      if (self.buffer.length >= rectangle_length+12) {
-      
-        var cur_rect_raw = read(12);          
-        self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
-        
-        num_r -= 1;       // decrement rectangle count
-                          // remove rectangle from buffer
-        
-        if (num_r == 0) { // no more rectangles
-          num_r = -1;
-          msg_type = -1;
-        }
-        
-        // Continue down the rabbit-hole, immediatly, dont wait for more data!
-        // we already got a bunch!
-        if (self.buffer.length > 0) {
-          process_buffer();
-        }
-        
-      }
-    
     // 6.5.2 SetColourMapEntries
     // When the pixel format uses a “colour map”, this message tells the
     // client that the specified pixel values should be mapped to the given
@@ -387,20 +439,27 @@ function Vnc(o) {
     //
     } else if ((self.state == CONNECTED) && (msg_type == 3)) {
       
-      self.log('Server, CUT TEXT');
-      
-      var text_length = u32_to_num(read(1), read(1), read(1), read(1));
-      cut_text = '';
-      
-      for(var i=8; i<buffer.length; i++) {
-        cut_text += buffer[i];
+      self.log('CUT TEXT 0');
+      if (self.buffer.length >= 7) {
+        
+        self.log('CUT TEXT 1');
+        var text_length = u32_to_num(self.buffer[3],
+                                     self.buffer[4],
+                                     self.buffer[5],
+                                     self.buffer[6]);
+        
+        if (self.buffer.length >= 7+text_length) {
+          var cut_text = '';
+          for(var i=0; i<text_length; i++) {
+            cut_text += self.buffer[7+i];
+          }
+          
+          self.log('CUT TEXT 4: '+text_length+' '+ cut_text);
+          read(7+text_length);        
+          msg_type = -1;
+        }
       }
       
-      self.log('[ServerCutText: '+text_length+' '+ cut_text+']')
-      if (buffer.length == (8+text_length)) {
-        buffer = '';
-        msg_type = -1;
-      }
     }
     
     self.processing = false;
@@ -431,17 +490,17 @@ function Rfb() {
                   27: 0xff1b, // Escape
                   45: 0xff63, // Insert
                   46: 0xffff, // Delete
-                  36: 0xff50,   // Home
-                  35: 0xff57,    // End
-                  33: 0xff55,    // Page Up
-                  34: 0xff56,  // Page Down
-                  37: 0xff51,   // Left
-                  38: 0xff52,     // Up
-                  39: 0xff53,  // Right
-                  40: 0xff54,   // Down
-                  112: 0xffbe,     // F1
-                  113: 0xffbf,     // F2
-                  113: 0xffc0,     // ...
+                  36: 0xff50, // Home
+                  35: 0xff57, // End
+                  33: 0xff55, // Page Up
+                  34: 0xff56, // Page Down
+                  37: 0xff51, // Left
+                  38: 0xff52, // Up
+                  39: 0xff53, // Right
+                  40: 0xff54, // Down
+                  112: 0xffbe,  // F1
+                  113: 0xffbf,  // F2
+                  113: 0xffc0,  // ...
                   114: 0xffc1,
                   115: 0xffc2,
                   116: 0xffc3,
@@ -449,23 +508,44 @@ function Rfb() {
                   118: 0xffc5,
                   119: 0xffc6,
                   120: 0xffc7,
-                  121: 0xffc8,     // ...
-                  122: 0xffc9,    // F12
-                  16: 0xffe1, // Shift Left
+                  121: 0xffc8,  // ...
+                  122: 0xffc9,  // F12
+                  16: 0xffe1,   // Shift Left
                   'shiftr': 0xffe2, // Shift right
                   17: 0xffe3,  // Ctrl Left
                   'ctrlr': 0xffe4,  // Ctrl Right
                   'metal': 0xffe7,  // Meta Left
                   'metar': 0xffe8,  // Meta Right
-                  18: 0xffe9,   // Alt Left
-                  'altr': 0xffea};  // Alt Right
+                  18: 0xffe9,       // Alt Left
+                  'altr': 0xffea,
+                  'slash': 0x2f, // Slash "/"
+                  188: 0x2c,     // Comma ","
+                  190: 0x2e      // Period "."
+                  };  // Alt Right
   
   this.button_map = {1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64, 8:128};
   
   // 6.4.1 - SetPixelFormat
   // todo: implement...
-  this.setPixelFormat = function() {
-    return '';
+  this.setPixelFormat = function(pixel_format) {
+    
+    var r = num_to_u8(0);
+        r += num_to_u8(1)+num_to_u8(1)+num_to_u8(1); // padding
+        r += num_to_u8(pixel_format['bpp']);
+        r += num_to_u8(pixel_format['depth']);
+        r += num_to_u8(pixel_format['big_endian']);
+        r += num_to_u8(pixel_format['true_color']);
+        
+        r += num_to_u16(pixel_format['red_max']);
+        r += num_to_u16(pixel_format['green_max']);
+        r += num_to_u16(pixel_format['blue_max']);
+        
+        r += num_to_u8(pixel_format['red_shift']);
+        r += num_to_u8(pixel_format['green_shift']);
+        r += num_to_u8(pixel_format['blue_shift']);
+        r += num_to_u8(1)+num_to_u8(1)+num_to_u8(1); // padding
+        
+    return r;
   }
   
   // 6.4.2 - SetEncodings
