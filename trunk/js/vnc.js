@@ -83,7 +83,9 @@ function Vnc(o) {
   for (param in o) { self[param] = o[param]; }
     
   // Wrap around communication library
-  self.disconnect = function () { self.ws.close(); };
+  self.disconnect = function () {    
+    self.ws.close();  
+  };
   self.connect    = function () {
     
     self.state = CONNECTING;
@@ -99,12 +101,15 @@ function Vnc(o) {
     }
     
     self.ws.onopen = function() {
+            
       self.state = HANDSHAKE;
       setTimeout(self.onstatechange, 0, self.state);
     };
     
     self.ws.onclose = function() {
-      self.state = DISCONNECTED;
+      
+      overlay_text('DISCONNECTED.');
+      self.state = DISCONNECTED;      
       setTimeout(self.onstatechange, 0, self.state);
     };
     
@@ -168,6 +173,29 @@ function Vnc(o) {
     self.ws.send( $.base64Encode( self.rfb.keyEvent(key_sym, pressed) ));
     
   }  
+  
+  // Write text on top of the framebuffer
+  function overlay_text(text) {
+    
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.shadowBlur = 2;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+   
+    ctx.font      = "36px Verdana";
+    ctx.fillStyle = "Black";
+    
+    var txt_dim = ctx.measureText(text);
+    
+    var x = Math.floor((self.server_info.width - txt_dim.width)/2);
+    var y = Math.floor(self.server_info.height/2)
+     
+    ctx.fillStyle = 'rgb(0, 50, 150)';
+    ctx.fillRect (x-10, y-50, txt_dim.width+20, 80);
+    
+    ctx.fillStyle = 'Black';
+    ctx.fillText(text, x, y);
+  }
   
   // A non-blocking read call. It will attempt and read bytes
   function read(size) {
@@ -281,7 +309,7 @@ function Vnc(o) {
         self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
         
         ctx.putImageData(self.server_info.data, 0, 0);
-        ctx.fillStyle = 'rgb(200,0,0)';
+        ctx.fillStyle = 'rgb(0, 75, 225)';
         ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
         
         // Listen for mouse+keyboard input
@@ -300,9 +328,10 @@ function Vnc(o) {
         msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
         self.ws.send( msg );
         
-        
         fbur_poll(0); // Start framebuffer polling
-              
+
+        overlay_text("Waiting for initial framebuffer.");
+        
         self.state = CONNECTED;
         setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
         
@@ -408,9 +437,16 @@ function Vnc(o) {
         self.log('CPL='+cursor_pixels_length+',BML='+bitmask_length);
         
         if (self.buffer.length >= (cursor_pixels_length+bitmask_length+12)) {
+                    
+          read(12); // headers
           
-          self.log('Is it done here');          
-          read(cursor_pixels_length+bitmask_length+12);
+          // The cursor bitmap is currenly unused.
+          var cursor_pixels_raw = read(cursor_pixels_length);
+          var cursor_image_data = ctx.createImageData(rect.h, rect.w);          
+          var bitmask_scanlines = read(bitmask_length);          
+          for(var i=0; i<cursor_pixels_raw.length; i++) {
+            cursor_image_data[i] = u8_to_num(cursor_pixels_raw[i]);
+          }
         
           num_r -= 1;
           if (num_r == 0) { // no more rectangles
@@ -443,7 +479,7 @@ function Vnc(o) {
         self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
         
         ctx.putImageData(self.server_info.data, 0, 0);
-        ctx.fillStyle = 'rgb(200,0,0)';
+        ctx.fillStyle = 'rgb(0, 75, 225)';
         ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
         
         num_r -= 1;
