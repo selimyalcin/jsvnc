@@ -66,6 +66,15 @@ function Hobs(url) {
   this.url  = parseUri(url);
   this.args = parseArgs(this.url);
   
+  var Session    =  { id: 0,
+                      request_id: 0,
+                      sending:    0,
+                      wait:   50,
+                      prefix: this.args[0],
+                      endpoint_host: this.args[1],
+                      endpoint_port: this.args[2]
+                    };
+  
   var CONNECTING  = 0;
   var OPEN        = 1;
   var CLOSING     = 2;
@@ -107,10 +116,6 @@ function Hobs(url) {
       try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch(e) {}
       throw new Error('Could not find XMLHttpRequest or an alternative.');
   };
-                  
-  var Session    =  { id: 0,      request_id: 0,
-                      sending: 0, wait: 50
-                    };
   
   var output_queue = new Array();
   var recv_buffer = '';
@@ -158,7 +163,7 @@ function Hobs(url) {
     // Create the request-identifier offset
     Session.request_id = generate_rid();
     
-    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/create/'+Session.request_id+'/'+Session.wait+'/'+self.args.host+'/'+self.args.port);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/create/'+Session.request_id+'/'+Session.wait+'/'+Session.endpoint_host+'/'+Session.endpoint_port);
     
     xhr.onreadystatechange = function(event) {
                         
@@ -198,7 +203,7 @@ function Hobs(url) {
   }
   
   // Parses /hej:123/med:321/dig:666 to {'hej': 123, 'med': 321, 'dig': 666}
-  function parseArgs(url) {
+  function parseNamedArgs(url) {
     
     var pairs = url.path.split('/');
     var args  = {};
@@ -212,6 +217,13 @@ function Hobs(url) {
     
   }
   
+  function parseArgs(url) {
+    var args = url.path.split('/');
+    args = args.slice(1,args.length);
+    
+    return args;
+  }
+  
   // Helper for outgoing data, used by send()
   function q_send(data) {
   
@@ -219,7 +231,7 @@ function Hobs(url) {
     
     var xhr = createXHR();
     
-    xhr.open('POST', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/hobs/session/'+Session.id+'/'+Session.request_id);
+    xhr.open('POST', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/session/'+Session.id+'/'+Session.request_id);
     xhr.setRequestHeader("Content-Type", "text/plain");
     
     xhr.onreadystatechange = function(event) {

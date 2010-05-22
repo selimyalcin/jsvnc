@@ -30,12 +30,25 @@ $(document).ready(function(){
                 document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n' +document.getElementById("log").innerHTML;
               }
             };
-  key_map = {8: 0xff08, 9: 0xff09, 13: 0xff0d, 27: 0xff1b, 45: 0xff63};
-  
-  if (8 in key_map) {
-    gui.log('jep it is there!'+key_map[8]);
+            
+  function pixel_format(bpp, depth, big_endian, true_color,
+                        red_max, green_max, blue_max,
+                        red_shift, green_shift, blue_shift) {
+    
+    return {bpp: bpp, depth:depth,
+            big_endian:big_endian, true_color:true_color,
+            red_max:red_max, green_max:green_max, blue_max:blue_max,
+            red_shift:red_shift, green_shift:green_shift, blue_shift:blue_shift
+            };  
+    
   }
-  
+
+  this.setPixelFormat = function(pixel_format) {
+    return u8;
+  }
+
+  gui.log(pixel_format(32, 24, false, true, 255, 255, 255, 16, 8, 0)['bpp']);
+
   function mouse_handler(event) {
   
     var offset = $('#fb').offset() // Position of the canvas element relative to the document
