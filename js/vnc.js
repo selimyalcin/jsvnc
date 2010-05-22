@@ -46,7 +46,7 @@ function Vnc(o) {
   var DISCONNECTED  = 300;
   
   //var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
-  var ENCODINGS = [0, 1, -223]; // RAW, copy-rect, pseudo-desktop-size
+  var ENCODINGS = [0, 1, -239, -223]; // RAW, copy-rect, pseudo-cursor, pseudo-desktop-size
   
   self.state  = DISCONNECTED;
   
@@ -400,11 +400,35 @@ function Vnc(o) {
         
       // Pseudo-encoding: Cursor
       } else if (rect.rect_encoding == -239) {
-        self.log('Pseudo-Cursor UNSUPPORTED Encoding');
+        self.log('Pseudo-Encoding: Cursor Partially supported Encoding');
+        
+        var cursor_pixels_length = rect.w * rect.h * (self.server_info.bpp / 8);
+        var bitmask_length = Math.floor((rect.w + 7) / 8) * rect.h;
+        
+        self.log('CPL='+cursor_pixels_length+',BML='+bitmask_length);
+        
+        if (self.buffer.length >= (cursor_pixels_length+bitmask_length+12)) {
+          
+          self.log('Is it done here');          
+          read(cursor_pixels_length+bitmask_length+12);
+        
+          num_r -= 1;
+          if (num_r == 0) { // no more rectangles
+            num_r = -1;
+            msg_type = -1;
+          }
+          
+          // Continue down the rabbit-hole, immediatly, dont wait for more data!
+          // we already got a bunch!
+          if (self.buffer.length > 0) {
+            process_buffer();
+          }
+        
+        }
         
       // pseudo-encoding: DesktopSize
       } else if (rect.rect_encoding == -223) {
-        self.log('Desktop-Size');
+        self.log('Pseudo-Encoding: DesktopSize');
         
         // Adjust the desktop-size!
         read(12);
@@ -421,12 +445,6 @@ function Vnc(o) {
         ctx.putImageData(self.server_info.data, 0, 0);
         ctx.fillStyle = 'rgb(200,0,0)';
         ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
-        
-        //$('#'+self.ctx_id).width(rect.w);
-        //$('#'+self.ctx_id).height(rect.h);
-        //
-        //ctx.fillRect(0,0, rect.w, rect.h);
-        self.log('RESIZE TO: '+rect.w+', '+rect.h);
         
         num_r -= 1;
         if (num_r == 0) { // no more rectangles
