@@ -19,7 +19,7 @@ function Vnc(o) {
   if( o.vnc_host == undefined ) o.vnc_host = 'jsvnc-01';
   if( o.vnc_port == undefined ) o.vnc_port = '59000';
   
-  if( o.ws_host == undefined ) o.ws_host = 'jsvnc-01';
+  if( o.ws_host == undefined ) o.ws_host = 'mifcho-01';
   if( o.ws_port == undefined ) o.ws_port = '8000';
     
   if( o.agent == undefined ) o.agent = 'ANY'; // Mifcho overlay agent
@@ -70,11 +70,17 @@ function Vnc(o) {
     
   }
   
-  var ctx; // Initialized during handshake
+  var ctx;            // Initialized during handshake
+  var canvas;         // Initialized during handshake
+  
   var msg_type = -1;
   var num_r = -1;
   var cur_r = 0;
   var rect = { x: 0, y: 0, w: 0, h: 0, rect_encoding: -1000 };
+  
+  var Mouse = {x:0, y:0, pressed:false, button:0  };
+  
+  var FburPoll = {frequency: 300, polling:false };
   
   self.buffer = '';
   self.processing = false;
@@ -108,8 +114,9 @@ function Vnc(o) {
     
     self.ws.onclose = function() {
       
-      overlay_text('DISCONNECTED.');
-      self.state = DISCONNECTED;      
+      overlay_text('DISCONNECTED');
+      self.state = DISCONNECTED;
+      FburPoll.polling = false;
       setTimeout(self.onstatechange, 0, self.state);
     };
     
@@ -130,26 +137,42 @@ function Vnc(o) {
   
   self.onstatechange = function () { };
   
-  function mouse_handler(event) {
+  function init_canvas() {
+    
+    // Initialize the canvas context
+    document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
+    canvas  = document.getElementById(self.ctx_id);                
+    ctx     = document.getElementById(self.ctx_id).getContext('2d');
+    ctx.fillStyle = 'rgb(0, 75, 225)';
+    ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+    
+    // Listen for mouse+keyboard input
+    window.oncontextmenu = function () { return false; }
+    canvas.onmousedown = function (event) {   mouse_click_handler(event); };
+    canvas.onmouseup = function (event) {     mouse_click_handler(event); };
+    canvas.onmousemove = function (event) { mouse_move_handler(event); };
+    
+    window.onkeydown = function (event) { key_handler(event);  };
+    window.onkeyup = function (event) {   key_handler(event);  };    
+  }
+  
+  function mouse_move_handler(event) {
+    Mouse.x = event.pageX - canvas.offsetLeft;
+    Mouse.y = event.pageY - canvas.offsetTop;
+    
+    self.ws.send($.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ));
+  }
+  
+  function mouse_click_handler(event) {
 
-    var offset = $('#'+self.ctx_id).offset() // Position of the canvas element relative to the document
-    var cursor_x, cursor_y = 0;   
-    
-    // TODO: Fix coordinates according to scale
-    if (self.server_info.scaled == 1) {
-      cursor_x = event.pageX - offset.left;
-      cursor_y = event.pageY - offset.top;  
-    } else {
-      cursor_x = event.pageX - offset.left;
-      cursor_y = event.pageY - offset.top;  
-    }
-    
-    var pressed = true;
+    Mouse.button = event.which;
     if (event.type == 'mouseup') {
-      pressed = false;      
+      Mouse.pressed = false;
+    } else {
+      Mouse.pressed = true;
     }
     
-    self.ws.send($.base64Encode( self.rfb.pointerEvent(cursor_x, cursor_y, pressed, event.which) ));
+    self.ws.send($.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ));
     
   }
   
@@ -191,7 +214,7 @@ function Vnc(o) {
     var y = Math.floor(self.server_info.height/2)
      
     ctx.fillStyle = 'rgb(0, 50, 150)';
-    ctx.fillRect (x-10, y-50, txt_dim.width+20, 80);
+    ctx.fillRect (x-20, y-50, txt_dim.width+40, 80);
     
     ctx.fillStyle = 'Black';
     ctx.fillText(text, x, y);
@@ -213,13 +236,26 @@ function Vnc(o) {
   // every tenth request is for a complete framebuffer
   function fbur_poll(poll_count) {
     
-    // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
-    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, (poll_count % 120)) );
-
-    self.ws.send( msg );
-    self.server_info.bytes_sent += msg.length;
+    if (FburPoll.polling) {
+      
+      // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
+      var incremental = 1;
+      if (poll_count == 0) {
+        incremental = 0;
+      }
+      var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, incremental) );
+      self.server_info.bytes_sent += msg.length;
+      
+      // prepend the mouse-position
+      if (Mouse.pressed == false) {
+        msg = $.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ) + msg;
+        self.server_info.bytes_sent += msg.length;
+      }      
+      self.ws.send( msg );
+      
+      setTimeout(fbur_poll, FburPoll.frequency, ++poll_count);
     
-    setTimeout(fbur_poll, 1000, ++poll_count);
+    }
   }
   
   var sec_types = new Array();
@@ -304,22 +340,8 @@ function Vnc(o) {
         self.server_info.name = read(name_len);
                 
         // Initialize the canvas context
-        document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
-        ctx = document.getElementById(self.ctx_id).getContext('2d');
-        self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
-        
-        ctx.putImageData(self.server_info.data, 0, 0);
-        ctx.fillStyle = 'rgb(0, 75, 225)';
-        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
-        
-        // Listen for mouse+keyboard input
-        window.oncontextmenu = function () { return false; }
-        $(window).mousedown(function (event) { mouse_handler(event);});
-        $(window).mouseup(function (event) {   mouse_handler(event);});
-        
-        $(window).keydown(function (event) { key_handler(event);  });
-        $(window).keyup(function (event) {   key_handler(event);  });
-                
+        init_canvas();
+                                
         // setPixelFormat        
         var msg = $.base64Encode( self.rfb.setPixelFormat(self.server_info) );
         self.ws.send( msg );
@@ -328,9 +350,10 @@ function Vnc(o) {
         msg = $.base64Encode( self.rfb.setEncodings(ENCODINGS) );
         self.ws.send( msg );
         
+        FburPoll.polling = true;
         fbur_poll(0); // Start framebuffer polling
 
-        overlay_text("Waiting for initial framebuffer.");
+        overlay_text("Initializing display...");
         
         self.state = CONNECTED;
         setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
@@ -474,13 +497,7 @@ function Vnc(o) {
                 
         // Re-Initialize the canvas context
         $('#'+self.ctx_id).remove();
-        document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
-        ctx = document.getElementById(self.ctx_id).getContext('2d');
-        self.server_info.data = ctx.createImageData(self.server_info.width, self.server_info.height);
-        
-        ctx.putImageData(self.server_info.data, 0, 0);
-        ctx.fillStyle = 'rgb(0, 75, 225)';
-        ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
+        init_canvas();
         
         num_r -= 1;
         if (num_r == 0) { // no more rectangles
@@ -555,7 +572,7 @@ function Vnc(o) {
   }
   
   self.refresh = function() {
-    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 1) );
+    var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 0) );
     self.ws.send( msg );
     self.server_info.bytes_sent += msg.length;
   }
