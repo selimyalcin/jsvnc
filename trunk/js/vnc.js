@@ -26,7 +26,8 @@ function Vnc(o) {
   
   // GUI bindings
   if( o.log == undefined ) o.log = function (msg) {
-    document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n' +document.getElementById("log").innerHTML;
+    var date = new Date();
+    document.getElementById("log").innerHTML = date.getHours()+':'+date.getMinutes()+':'+date.getSeconds()+','+date.getMilliseconds()+': '+msg+'\n' +document.getElementById("log").innerHTML;
   }
   if (o.ctx_id == undefined ) o.ctx_id = 'vnc_canvas';
   if (o.fc_id == undefined ) o.fc_id = 'frame_container';
@@ -97,8 +98,8 @@ function Vnc(o) {
     self.state = CONNECTING;
     setTimeout(self.onstatechange, 0, self.state);
 
-    //if ("WebSocket" in window) {
-    if (false) {
+    if ("WebSocket" in window) {
+    //if (false) {
       self.log('Using Websocket transport.');
       self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);      
     } else {
@@ -107,7 +108,6 @@ function Vnc(o) {
     }
     
     self.ws.onopen = function() {
-            
       self.state = HANDSHAKE;
       setTimeout(self.onstatechange, 0, self.state);
     };
@@ -125,7 +125,6 @@ function Vnc(o) {
       
       self.bytes_recv += event.data.length;
       self.buffer += $.base64Decode( event.data );
-      self.log('Buffer-Length: '+self.buffer.length);
             
       if (!self.processing) {
         process_buffer(); 
@@ -190,8 +189,7 @@ function Vnc(o) {
     if (event.type == 'keyup') {
       pressed = false;
     }
-    
-    self.log('[KEYEVENT: '+event.type+': '+event.which+','+String.fromCharCode(event.which)+']');    
+
     
     self.ws.send( $.base64Encode( self.rfb.keyEvent(key_sym, pressed) ));
     
@@ -232,13 +230,11 @@ function Vnc(o) {
     
   }
   
-  // Send request for updates each second.
-  // every tenth request is for a complete framebuffer
+  // Send request for updates each FburPoll seconds
   function fbur_poll(poll_count) {
     
     if (FburPoll.polling) {
       
-      // Every tenth fb_req is a full framebufferupdaterequest, rest are incremental
       var incremental = 1;
       if (poll_count == 0) {
         incremental = 0;
@@ -288,7 +284,7 @@ function Vnc(o) {
         // Connection failed
         // TODO: handle a failde connection attempt!
       }
-      //self.log('Security types:' +num_sec+','+ JSON.stringify(sec_types));
+
       self.ws.send( $.base64Encode( num_to_u8(1)) ); // Select sec-type None
       self.server_info.bytes_sent++;
       
@@ -303,7 +299,6 @@ function Vnc(o) {
         // TODO: Handle a failed security response        
       }
       
-      //self.log('Security Result:'+ sec_res);
       self.ws.send( $.base64Encode( num_to_u8(0) )); // Send client-init
       self.server_info.bytes_sent++;
       
@@ -374,7 +369,8 @@ function Vnc(o) {
       if (num_r == -1) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
-        self.log('Rectangles: '+num_r);                
+        
+        self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
       }
       
       rect = {
@@ -384,17 +380,15 @@ function Vnc(o) {
         h: u16_to_num(self.buffer[6], self.buffer[7]),
         rect_encoding: u32_to_num(self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11])
       };
-      
-      self.log('Rectangle: '+JSON.stringify(rect));
-      
+            
       // RAW encoding
       if (rect.rect_encoding == 0) {
-        self.log('RAW Encoding!');
-        
+
         var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
         if (self.buffer.length >= rectangle_length+12) {
         
           var cur_rect_raw = read(12);
+          self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+self.rfb.enc_map[rect.rect_encoding.toString()]);
           self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
           
           num_r -= 1;       // decrement rectangle count
@@ -402,7 +396,7 @@ function Vnc(o) {
           
           if (num_r == 0) { // no more rectangles
             num_r = -1;
-            msg_type = -1;
+            msg_type = -1;            
           }
           
           // Continue down the rabbit-hole, immediatly, dont wait for more data!
@@ -414,13 +408,12 @@ function Vnc(o) {
         }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        self.log('COPY-RECT Encoding');
+        self.log('COPY-RECT');
         
         if (self.buffer.length >= 12+4) {
           var cur_rect_raw = read(12);
           var src_x = u16_to_num(read(1), read(1));
           var src_y = u16_to_num(read(1), read(1));
-          self.log('[CR '+src_x+','+src_y+']')
           
           var copied_rect = ctx.getImageData(src_x, src_y, rect.w, rect.h);  // Get a rectangle buffer
           ctx.putImageData(copied_rect, rect.x, rect.y);
@@ -457,8 +450,6 @@ function Vnc(o) {
         var cursor_pixels_length = rect.w * rect.h * (self.server_info.bpp / 8);
         var bitmask_length = Math.floor((rect.w + 7) / 8) * rect.h;
         
-        self.log('CPL='+cursor_pixels_length+',BML='+bitmask_length);
-        
         if (self.buffer.length >= (cursor_pixels_length+bitmask_length+12)) {
                     
           read(12); // headers
@@ -474,7 +465,7 @@ function Vnc(o) {
           num_r -= 1;
           if (num_r == 0) { // no more rectangles
             num_r = -1;
-            msg_type = -1;
+            msg_type = -1;            
           }
           
           // Continue down the rabbit-hole, immediatly, dont wait for more data!
@@ -521,7 +512,7 @@ function Vnc(o) {
     // RGB intensities.
     //        
     } else if ((self.state == CONNECTED) && (msg_type == 1)) {
-      self.log('SET COLOR-MAP.... dammit...');
+      self.log('SET COLOR-MAP - Unsupported');
       msg_type = -1;
       
     // 6.5.3 Bell
@@ -583,6 +574,8 @@ function Rfb() {
 
   // Client to server messages
   this.std_encodings = [0, 1, 2, 5, 16, -239, -223];
+  this.enc_map = {'0': 'RAW', '1': 'COPY-RECT', '2':'..', '5':'...', '16':'..', '-239':'Pseudo1', '-223':'Pseudo2'};
+  
   
   this.key_map = {8: 0xff08,  // Backspace
                   9: 0xff09,  // Tab
