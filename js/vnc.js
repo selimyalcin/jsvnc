@@ -81,7 +81,7 @@ function Vnc(o) {
   
   var Mouse = {x:0, y:0, pressed:false, button:0  };
   
-  var FburPoll = {frequency: 300, polling:false };
+  var FburPoll = {frequency: 2000, polling:false };
   
   self.buffer = '';
   self.processing = false;
@@ -98,10 +98,10 @@ function Vnc(o) {
     self.state = CONNECTING;
     setTimeout(self.onstatechange, 0, self.state);
 
-    if ("WebSocket" in window) {
-    //if (false) {
+    //if ("WebSocket" in window) {
+    if (false) {
       self.log('Using Websocket transport.');
-      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);      
+      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/1234/'+self.vnc_host+'/'+self.vnc_port);      
     } else {
       self.log('Using Hobs transport.');
       self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);  
@@ -159,7 +159,9 @@ function Vnc(o) {
     Mouse.x = event.pageX - canvas.offsetLeft;
     Mouse.y = event.pageY - canvas.offsetTop;
     
-    self.ws.send($.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ));
+    self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
+                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    ));
   }
   
   function mouse_click_handler(event) {
@@ -171,7 +173,9 @@ function Vnc(o) {
       Mouse.pressed = true;
     }
     
-    self.ws.send($.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ));
+    self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
+                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    ));
     
   }
   
@@ -191,7 +195,9 @@ function Vnc(o) {
     }
 
     
-    self.ws.send( $.base64Encode( self.rfb.keyEvent(key_sym, pressed) ));
+    self.ws.send($.base64Encode(  self.rfb.keyEvent(key_sym, pressed)
+                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    ));
     
   }  
   
