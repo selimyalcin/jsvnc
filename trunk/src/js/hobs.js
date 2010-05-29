@@ -64,16 +64,8 @@ function Hobs(url) {
   
   // Hobs / Websocket interface
   this.url  = parseUri(url);
-  this.args = parseArgs(this.url);
-  
-  var Session    =  { id: 0,
-                      request_id: 0,
-                      sending:    0,
-                      wait:   50,
-                      prefix: this.args[0],
-                      endpoint_host: this.args[1],
-                      endpoint_port: this.args[2]
-                    };
+    
+  var Session = parseArgs(this.url);    
   
   var CONNECTING  = 0;
   var OPEN        = 1;
@@ -152,7 +144,7 @@ function Hobs(url) {
       self.readyState = CLOSED;
     }
   }
-
+  
   // Helper for "instantiating" hubs.
   function connect () {
     
@@ -218,10 +210,42 @@ function Hobs(url) {
   }
   
   function parseArgs(url) {
+        
+    var prefix = '';
+    var peer_id = '';
+    var ep_host = '';
+    var ep_port = 0;
     var args = url.path.split('/');
-    args = args.slice(1,args.length);
     
-    return args;
+    if (args.length == 4) {
+      
+      prefix  = args[1];
+
+      ep_host = args[2];
+      ep_port = args[3];
+      
+    } else if (args.length == 5) {
+      
+      prefix  = args[1];
+      peer_id = args[2];
+      ep_host = args[3];
+      ep_port = args[4];
+      
+    } else {
+      // something bad happened
+    }
+    
+    return {
+      id:         0,
+      request_id: 0,
+      sending:    0,
+      wait:           0,
+      prefix:         prefix,
+      peer_id:        peer_id,
+      endpoint_host:  ep_host,
+      endpoint_port:  ep_port
+    };
+    
   }
   
   // Helper for outgoing data, used by send()
