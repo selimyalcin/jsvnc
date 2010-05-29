@@ -101,10 +101,12 @@ function Vnc(o) {
     if ("WebSocket" in window) {
     //if (false) {
       self.log('Using Websocket transport.');
-      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);      
+      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);
+      //self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/1234/'+self.vnc_host+'/'+self.vnc_port);      
     } else {
       self.log('Using Hobs transport.');
-      self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);  
+      self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);
+      //self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/1234/'+self.vnc_host+'/'+self.vnc_port);  
     }
     
     self.ws.onopen = function() {

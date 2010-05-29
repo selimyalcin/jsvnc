@@ -154,6 +154,7 @@ function Hobs(url) {
     
     // Create the request-identifier offset
     Session.request_id = generate_rid();
+    log(JSON.stringify(Session));
     
     xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/create/'+Session.request_id+'/'+Session.wait+'/'+Session.endpoint_host+'/'+Session.endpoint_port);
     
@@ -239,7 +240,7 @@ function Hobs(url) {
       id:         0,
       request_id: 0,
       sending:    0,
-      wait:           0,
+      wait:           50,
       prefix:         prefix,
       peer_id:        peer_id,
       endpoint_host:  ep_host,
