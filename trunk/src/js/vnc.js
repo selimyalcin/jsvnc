@@ -377,7 +377,7 @@ function Vnc(o) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
         
-        self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
+        //self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
       }
       
       rect = {
@@ -395,7 +395,7 @@ function Vnc(o) {
         if (self.buffer.length >= rectangle_length+12) {
         
           var cur_rect_raw = read(12);
-          self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+self.rfb.enc_map[rect.rect_encoding.toString()]);
+          //self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+self.rfb.enc_map[rect.rect_encoding.toString()]);
           self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
           
           num_r -= 1;       // decrement rectangle count
@@ -415,7 +415,7 @@ function Vnc(o) {
         }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        self.log('COPY-RECT');
+        //self.log('COPY-RECT');
         
         if (self.buffer.length >= 12+4) {
           var cur_rect_raw = read(12);
@@ -452,7 +452,7 @@ function Vnc(o) {
         
       // Pseudo-encoding: Cursor
       } else if (rect.rect_encoding == -239) {
-        self.log('Pseudo-Encoding: Cursor Partially supported Encoding');
+        //self.log('Pseudo-Encoding: Cursor Partially supported Encoding');
         
         var cursor_pixels_length = rect.w * rect.h * (self.server_info.bpp / 8);
         var bitmask_length = Math.floor((rect.w + 7) / 8) * rect.h;
@@ -485,7 +485,7 @@ function Vnc(o) {
         
       // pseudo-encoding: DesktopSize
       } else if (rect.rect_encoding == -223) {
-        self.log('Pseudo-Encoding: DesktopSize');
+        //self.log('Pseudo-Encoding: DesktopSize');
         
         // Adjust the desktop-size!
         read(12);
