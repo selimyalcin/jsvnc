@@ -58,9 +58,7 @@
       <span>Unknown</span>
     </div>
 
-    &nbsp;  
-    <div id="disconnect"  title="Close the current connection."   class="btn icon disconnect" >Disconnect</div>
-      
+    &nbsp;        
     <div class="info">
       
       <fieldset>
@@ -68,22 +66,25 @@
         <table>
           <tr>
             <td>VNC Host/Port</td>
-            <td><input id="vnc_host" class="host" type="text" name="vnc_host" value="jsvnc-01" />
-              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="59000" />
+            <td>
+            <input id="vnc_host" class="host" type="text" name="vnc_host" value="jsvnc-01" />
+            <!--	<input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost" /> -->
+              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900" />
             </td>
           </tr>
           <tr>
             <td>WS Host/Port</td>
-            <td><input id="ws_host" class="host" type="text" name="ws_host" value="tile-0-0" />
+            <td>
+            <input id="ws_host" class="host" type="text" name="ws_host" value="tile-0-0" />
+<!--		<input id="ws_host" class="host" type="text" name="ws_host" value="localhost" />-->
                / <input id="ws_port" type="text" class="port" name="ws_port" value="8000" />
             </td>
           </tr>
-          <tr><td colspan="2"><div id="connect" class="btn icon connect">Connect</div></td></tr>
         </table>
       
       </fieldset>
       
-      <span>Reconnect</span>
+      <span id="connection" class="btn icon">Connect</span>
       
     </div>
   </div>
@@ -98,85 +99,109 @@ $(document).ready(function(){
               'pinned': 1,
               'log': function (msg) {
                 document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';  
-              }
+              },
+              'created': false
             };
-    
-  var vnc = new Vnc({ vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
-                      ws_host: $('#ws_host').val(),   ws_port: $('#ws_port').val()});
-  vnc.connect();
-  vnc.onstatechange = function (state) {
-    
-    if ((state > 0) && (state < 100)) {
-      $('#con_status > span').html('Connecting');
-      $('#con_status').removeClass('disconnected').addClass('connected');
-    } else if ((state >= 100) && (state <200)) {
-      $('#con_status > span').html('Handshaking');
-      $('#con_status').removeClass('disconnected').addClass('connected');
-    } else if ((state >= 200) && (state < 300)) {
-      $('#con_status > span').html('Connected');
-      $('#con_status').removeClass('disconnected').addClass('connected');
-      
-      /* GUI buttons */
   
-      // Pin click
-      $('#pin').click(function (event) {
-
-        gui['pinned'] = gui['pinned']^1;
-        
-        if ($('#panel').hasClass('unpinned')) {
-          $('#panel').removeClass('unpinned');
-          $('#panel').removeClass('hidden');
-          $('#pin').removeClass('unpin').addClass('pin');
-        } else {
-          $('#panel').addClass('unpinned');
-          $('#panel').addClass('hidden');
-          $('#pin').removeClass('pin').addClass('unpin');
-        }
-        
-      });
+  var vnc;
+  
+  function bind_vnc() {
+    
+    // Check state, if not connected then do this:
+    vnc = new Vnc({ vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
+                        ws_host: $('#ws_host').val(),   ws_port: $('#ws_port').val()});
+    
+    gui.created = true;
+    vnc.connect();
+    vnc.onstatechange = function (state) {
       
-      // Refresh click
-      $('#refresh').click(function (event) {    
-        vnc.refresh();
-      });
+      if ((state > 0) && (state < 100)) {
+        $('#con_status > span').html('Connecting');
+        $('#con_status').removeClass('disconnected').addClass('connected');
+      } else if ((state >= 100) && (state <200)) {
+        $('#con_status > span').html('Handshaking');
+        $('#con_status').removeClass('disconnected').addClass('connected');
+      } else if ((state >= 200) && (state < 300)) {
+        $('#con_status > span').html('Connected');
+        $('#con_status').removeClass('disconnected').addClass('connected');
+        
+        /* GUI buttons */
+    
+        // Pin click
+        $('#pin').click(function (event) {
+  
+          gui['pinned'] = gui['pinned']^1;
+          
+          if ($('#panel').hasClass('unpinned')) {
+            $('#panel').removeClass('unpinned');
+            $('#panel').removeClass('hidden');
+            $('#pin').removeClass('unpin').addClass('pin');
+          } else {
+            $('#panel').addClass('unpinned');
+            $('#panel').addClass('hidden');
+            $('#pin').removeClass('pin').addClass('unpin');
+          }
+          
+        });
+        
+        $('#connection').click(function () { vnc.disconnect(); } );
+        
+        // Refresh click
+        $('#refresh').click(function (event) {    
+          vnc.refresh();
+        });
+        
+        // Scale click
+        $('#scale').click(function () {
+                
+          var w = 0;
+          var h = 0;
+          
+          // Toggle scaling
+          gui['scaled'] = gui['scaled']^1;
+          
+          // Determine width and height
+          if (gui['scaled'] == 1) {
+            w = $(window).width();      
+            h = $(window).height();
+          } else {
+            w = vnc.server_info.width;
+            h = vnc.server_info.height
+          }
+          
+          // Do scaling
+          $('#frame_container canvas').width(w);
+          $('#frame_container canvas').height(h);
+          
+        });
+        
+      } else if (state == 300) {
+        $('#con_status > span').html('Disconnected');
+        $('#con_status').removeClass('connected').addClass('disconnected');
+        
+      } else {
+        $('#con_status > span').html('Unknown');
+      }
       
-      // Scale click
-      $('#scale').click(function () {
-              
-        var w = 0;
-        var h = 0;
-        
-        // Toggle scaling
-        gui['scaled'] = gui['scaled']^1;
-        
-        // Determine width and height
-        if (gui['scaled'] == 1) {
-          w = $(window).width();      
-          h = $(window).height();
-        } else {
-          w = vnc.server_info.width;
-          h = vnc.server_info.height
-        }
-        
-        // Do scaling
-        $('#frame_container canvas').width(w);
-        $('#frame_container canvas').height(h);
-        
-      });
-      
-      // Disconnect click
-      $('#disconnect').click(function () {
-        vnc.disconnect();
-      });
-      
-    } else if (state == 300) {
-      $('#con_status > span').html('Disconnected');
-      $('#con_status').removeClass('connected').addClass('disconnected');
-    } else {
-      $('#con_status > span').html('Unknown');
     }
     
   }
+  
+  $('#connection').click(function () {
+    
+    if (gui.created) {
+      
+      gui.created=false;
+      vnc.disconnect();
+      bind_vnc();
+      
+    } else {
+  
+      bind_vnc();
+      
+    }  
+    
+  });
   
 });
 

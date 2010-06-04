@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import subprocess
+import sys
 
 def sample_cpu(pname):
   ps = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE).communicate()[0]
@@ -17,3 +18,7 @@ def sample_cpu(pname):
       mem_total += float(r[3])
 
   return (cpu_total, mem_total)
+
+if __name__ == "__main__":
+  pname = sys.argv[1]
+  print sample_cpu(pname)
