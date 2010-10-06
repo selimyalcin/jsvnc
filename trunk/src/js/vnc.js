@@ -44,15 +44,14 @@ function Vnc(o) {
   var HANDSHAKE_SRV_INIT  = 150;
   var CONNECTED           = 200;
   var CONNECTED_RECV_FB   = 210;
-  var DISCONNECTED  = 300;
+  var DISCONNECTED        = 300;
   
-  //var ENCODINGS = [0, 1, 2, 5, 16, -239, -223];
   var ENCODINGS = [0, 1, -239, -223]; // RAW, copy-rect, pseudo-cursor, pseudo-desktop-size
   
   self.state  = DISCONNECTED;
   
   // Framebuffer dimensions, servername and some other stuff
-  self.server_info = {width:      0,  height:       0,  bpp:        0,
+  self.server_info = {width:      800,  height:       600,  bpp:        0,
                       depth:      0,  big_endian:   0,  true_color: 0,
                       red_max:    0,  green_max:    0,  blue_max:   0,
                       red_shift:  0,  green_shift:  0,  blue_shift: 0,
@@ -99,18 +98,16 @@ function Vnc(o) {
     setTimeout(self.onstatechange, 0, self.state);
 
     if ("WebSocket" in window) {
-    //if (false) {
       self.log('Using Websocket transport.');
       self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);
-      //self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/1234/'+self.vnc_host+'/'+self.vnc_port);      
     } else {
       self.log('Using Hobs transport.');
       self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);
-      //self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/1234/'+self.vnc_host+'/'+self.vnc_port);  
     }
     
     self.ws.onopen = function() {
       self.state = HANDSHAKE;
+      overlay_text('CONNECTING...');
       setTimeout(self.onstatechange, 0, self.state);
     };
     
@@ -138,15 +135,22 @@ function Vnc(o) {
   
   self.onstatechange = function () { };
   
-  function init_canvas() {
+  function init_canvas(width, height) {
     
     // Initialize the canvas context
-    document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+self.server_info.width+'" height="'+self.server_info.height+'"></canvas>';
+    document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+width+'" height="'+height+'"></canvas>';
     canvas  = document.getElementById(self.ctx_id);                
     ctx     = document.getElementById(self.ctx_id).getContext('2d');
     ctx.fillStyle = 'rgb(0, 75, 225)';
-    ctx.fillRect(0,0, self.server_info.width, self.server_info.height);
-    
+
+    ctx.fillRect(0,0, width, height);
+  
+  }
+  
+  init_canvas(800, 600);
+  
+  function init_input () {
+  
     // Listen for mouse+keyboard input
     window.oncontextmenu = function () { return false; }
     canvas.onmousedown = function (event) {   mouse_click_handler(event); };
@@ -223,6 +227,19 @@ function Vnc(o) {
     
     ctx.fillStyle = 'Black';
     ctx.fillText(text, x, y);
+  }
+  
+  function update_serverinfo() {
+    
+    $('#hostname').html(self.server_info.name);
+    $('#fb_res').html(self.server_info.width+'x'+self.server_info.height);
+    $('#fb_bpp').html(self.server_info.bpp);
+    $('#fb_depth').html(self.server_info.depth);
+    $('#fb_endian').html(self.server_info.big_endian);
+    $('#fb_truecolor').html(self.server_info.true_color);
+    $('#fb_rgbmax').html(self.server_info.red_max+','+self.server_info.green_max+','+self.server_info.blue_max);
+    $('#fb_rgbshift').html(self.server_info.red_shift+','+self.server_info.green_shift+','+self.server_info.blue_shift);
+    
   }
   
   // A non-blocking read call. It will attempt and read bytes
@@ -342,7 +359,9 @@ function Vnc(o) {
         self.server_info.name = read(name_len);
                 
         // Initialize the canvas context
-        init_canvas();
+        $('#'+self.ctx_id).remove();
+        init_canvas(self.server_info.width, self.server_info.height);
+        init_input();
                                 
         // setPixelFormat        
         var msg = $.base64Encode( self.rfb.setPixelFormat(self.server_info) );
@@ -358,6 +377,15 @@ function Vnc(o) {
         overlay_text("Initializing display...");
         
         self.state = CONNECTED;
+        
+        var server_info_str = '';
+        for(key in self.server_info) {
+          server_info_str += key+':'+self.server_info[key];
+        }
+        self.log('Connected to: '+server_info_str+'.');
+        
+        update_serverinfo();
+        
         setTimeout(self.onstatechange, 0, self.state); // Notify onstatechange
         
       }
@@ -377,7 +405,7 @@ function Vnc(o) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
         
-        //self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
+        self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
       }
       
       rect = {
@@ -390,13 +418,14 @@ function Vnc(o) {
             
       // RAW encoding
       if (rect.rect_encoding == 0) {
-
+        
+        self.log('RAW Encoding');
         var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
         if (self.buffer.length >= rectangle_length+12) {
         
           var cur_rect_raw = read(12);
-          //self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+self.rfb.enc_map[rect.rect_encoding.toString()]);
-          self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx);
+          self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+rectangle_length+','+self.rfb.enc_map[rect.rect_encoding.toString()]+' '+rect.x+' '+rect.y+' '+rect.w+' '+rect.h);
+          self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx, self.server_info);
           
           num_r -= 1;       // decrement rectangle count
                             // remove rectangle from buffer
@@ -415,7 +444,7 @@ function Vnc(o) {
         }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        //self.log('COPY-RECT');
+        self.log('COPY-RECT');
         
         if (self.buffer.length >= 12+4) {
           var cur_rect_raw = read(12);
@@ -485,7 +514,7 @@ function Vnc(o) {
         
       // pseudo-encoding: DesktopSize
       } else if (rect.rect_encoding == -223) {
-        //self.log('Pseudo-Encoding: DesktopSize');
+        self.log('Pseudo-Encoding: DesktopSize');
         
         // Adjust the desktop-size!
         read(12);
@@ -495,7 +524,8 @@ function Vnc(o) {
                 
         // Re-Initialize the canvas context
         $('#'+self.ctx_id).remove();
-        init_canvas();
+        init_canvas(self.server_info.width, self.server_info.height);
+        init_input();
         
         num_r -= 1;
         if (num_r == 0) { // no more rectangles
@@ -579,10 +609,17 @@ function Vnc(o) {
 
 function Rfb() {
 
+  var self = this;
+
+  // GUI bindings
+  this.log = function (msg) {
+    var date = new Date();
+    document.getElementById("log").innerHTML = date.getHours()+':'+date.getMinutes()+':'+date.getSeconds()+','+date.getMilliseconds()+': '+msg+'\n' +document.getElementById("log").innerHTML;
+  }
+  
   // Client to server messages
   this.std_encodings = [0, 1, 2, 5, 16, -239, -223];
   this.enc_map = {'0': 'RAW', '1': 'COPY-RECT', '2':'..', '5':'...', '16':'..', '-239':'Pseudo1', '-223':'Pseudo2'};
-  
   
   this.key_map = {8: 0xff08,  // Backspace
                   9: 0xff09,  // Tab
@@ -719,27 +756,63 @@ function Rfb() {
   // @param data array of pixel values in raw-encoding
   // @param ctx A working 2d-canvas-context
   //
-  // @requires data.length = w * h * 4
+  // @requires data.length = w * h * (bpp / 8)
   //
-  this.draw_rectangle = function(r_x, r_y, w, h, pixel_array, ctx) {
+  this.draw_rectangle = function(r_x, r_y, w, h, pixel_array, ctx, server_info) {
   
-  // What it basicly does is to change the BGR representation to RGB....
-  // and ignore the alpha channel... it could probably be optimized with
-  // in-space operations instead calling getImageData...
+    // What it basicly does is to change the BGR representation to RGB....
+    // and ignore the alpha channel... it could probably be optimized with
+    // in-space operations instead calling getImageData...
     
-    var r_buffer = ctx.getImageData(r_x, r_y, w, h);  // Get a rectangle buffer
+    self.log('DRAW RECT> Start!');  
+    //var r_buffer  = ctx.getImageData(r_x, r_y, w, h);  // Get a rectangle buffer
+    var r_buffer  = ctx.createImageData(w, h);  // Get a rectangle buffer
+    self.log('DRAW RECT> Got buffer');  
     var alpha_val = 255;
+    self.log('DRAW RECT> set alpha = '+alpha_val);
+    var bytes_per_pixel = server_info.bpp / 8;
+    self.log('DRAW RECT> set bytes_per_pixel = '+ bytes_per_pixel);
     
-    for(var i=0; i<(w*h*4);i+=4) {                    // Map BGR to RGB
-                    
-        r_buffer.data[i]   = u8_to_num(pixel_array[i+2]);     // Update pixels...
-        r_buffer.data[i+1] = u8_to_num(pixel_array[i+1]);
-        r_buffer.data[i+2] = u8_to_num(pixel_array[i]);
+    var crap = '';
+    
+    
+    for(var i=0; i<(w*h*4);i+=4) {        
+      
+      // RBUFFER ordering:
+      // RGB
+      
+      if (bytes_per_pixel == 4) {         // Reorder BGR to RGB
         
-        r_buffer.data[i+3] = alpha_val;                     // Ignore transparency...
+        r_buffer.data[i]   = pixel_array[i+2].charCodeAt(0);
+        r_buffer.data[i+1] = pixel_array[i+1].charCodeAt(0);
+        r_buffer.data[i+2] = pixel_array[i].charCodeAt(0);
+        
+        r_buffer.data[i+3] = alpha_val;
+      
+      } else if (bytes_per_pixel == 3) {         // Reorder BGR to RGB
+        
+        r_buffer.data[i]   = pixel_array[i/bytes_per_pixel+2].charCodeAt(0);
+        r_buffer.data[i+1] = pixel_array[i/bytes_per_pixel+1].charCodeAt(0);
+        r_buffer.data[i+2] = pixel_array[i/bytes_per_pixel].charCodeAt(0);
+        
+        r_buffer.data[i+3] = alpha_val;
+        
+      } else if (bytes_per_pixel == 2) {
+        
+        // TODO: fix the color-shifting, current implementation just
+        // grayscales...
+        
+        r_buffer.data[i]    = pixel_array[i/bytes_per_pixel+1].charCodeAt(0);
+        r_buffer.data[i+2]  = pixel_array[i/bytes_per_pixel+1].charCodeAt(0);
+        r_buffer.data[i+1]  = pixel_array[i/bytes_per_pixel+1].charCodeAt(0);
+        
+        r_buffer.data[i+3]   = alpha_val;      
+        
+      }
       
     }
     
+    self.log('Stuffing the buffer'+ crap);    
     ctx.putImageData(r_buffer, r_x, r_y);                 // Draw it
   
   }
