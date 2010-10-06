@@ -20,11 +20,12 @@
 
     <div class="info icon log">  
       <fieldset>    
-      <pre id="log"></pre>
+      <pre id="log"></pre>      
       </fieldset>
       
       <span>Log</span>
     </div>
+    <div id="more_log"></div>
     &nbsp;  
     
     <div id="con_status" class="info icon">
@@ -47,6 +48,7 @@
         <table>
           <tr><td>Hostname</td><td><span    id="hostname">Unknown</span></td></tr>
           <tr><td>Resolution</td><td><span  id="fb_res">0x0x0</span></td></tr>
+          <tr><td>BPP</td><td><span id="fb_bpp">Unknown</span></td></tr>
           <tr><td>Color Depth</td><td><span id="fb_depth">Unknown</span></td></tr>
           <tr><td>Big Endian</td><td><span  id="fb_endian">Unknown</span></td></tr>
           <tr><td>True Color</td><td><span  id="fb_truecolor">Unknown</span></td></tr>
@@ -67,17 +69,15 @@
           <tr>
             <td>VNC Host/Port</td>
             <td>
-            <input id="vnc_host" class="host" type="text" name="vnc_host" value="jsvnc-01" />
-            <!--	<input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost" /> -->
-              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900" />
+            <input id="vnc_host" class="host" type="text" name="vnc_host" value="172.31.111.17"/>
+              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900"/>
             </td>
           </tr>
           <tr>
             <td>WS Host/Port</td>
             <td>
-            <input id="ws_host" class="host" type="text" name="ws_host" value="tile-0-0" />
-<!--		<input id="ws_host" class="host" type="text" name="ws_host" value="localhost" />-->
-               / <input id="ws_port" type="text" class="port" name="ws_port" value="8000" />
+            <input id="ws_host" class="host" type="text" name="ws_host" value="mifcho01"/>
+               / <input id="ws_port" type="text" class="port" name="ws_port" value="8000"/>
             </td>
           </tr>
         </table>
@@ -108,8 +108,12 @@ $(document).ready(function(){
   function bind_vnc() {
     
     // Check state, if not connected then do this:
-    vnc = new Vnc({ vnc_host: $('#vnc_host').val(), vnc_port: $('#vnc_port').val(),
-                        ws_host: $('#ws_host').val(),   ws_port: $('#ws_port').val()});
+    vnc = new Vnc({
+      vnc_host: $('#vnc_host').val(),
+      vnc_port: $('#vnc_port').val(),
+      ws_host:  $('#ws_host').val(),
+      ws_port:  $('#ws_port').val()
+    });
     
     gui.created = true;
     vnc.connect();
