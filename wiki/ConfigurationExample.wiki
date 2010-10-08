@@ -6,7 +6,7 @@ This is a configuration-example of installing/configuring jsVNC with MIFCHO for 
 == Do the following ==
 
 {{{
-
+# Create a directory for jsvnc+mifcho
 cd ~
 mkdir jsenv
 cd jsenv
