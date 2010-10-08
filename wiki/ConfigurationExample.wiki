@@ -13,7 +13,7 @@ mkdir jsenv
 cd jsenv
 
 # Download jsVNC
-svn export http://jsvnc.googlecode.com/svn/trunk/src/ jsvnv_src
+svn export http://jsvnc.googlecode.com/svn/trunk/src/ jsvnc_src
 
 # Download MIFCHO
 wget "http://mifcho.googlecode.com/svn/trunk/dist/mifcho-0.1.tar.gz"
