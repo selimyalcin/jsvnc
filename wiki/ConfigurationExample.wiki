@@ -1,3 +1,4 @@
+#labels installation,setup,configuration
 = Configuring jsVNC with MIFCHO =
 
 jsVNC utilizes MIFCHO as a translator of websockets/hobs to regular RAW sockets.
@@ -34,6 +35,10 @@ orchestration =
   8000 http /hobs HobsHandler
   8000 http /wsocket WebsocketHandler
   8000 http /jsvnc StaticWebHandler
+
+[StaticWebHandler]
+workers = 2
+path_prefix=/full/path/to/jsvnc/sourcecode/
 }}}
 
 == Run It ==
