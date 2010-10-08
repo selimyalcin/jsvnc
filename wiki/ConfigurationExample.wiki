@@ -18,15 +18,6 @@ svn export http://jsvnc.googlecode.com/svn/trunk/src/ jsvnc_src
 # Download MIFCHO
 wget "http://mifcho.googlecode.com/svn/trunk/dist/mifcho-0.1.tar.gz"
 tar xzf mifcho-0.1.tar.gz
-cd mifcho-0.1/
-
-# Install MIFCHO
-sudo python setup.py install
-
-# Cleanup
-cd ~
-rm -r mifcho-0.1
-rm mifcho-0.1.tar.gz
 }}}
 
 Create a configuration-file for MIFCHO named 'mifcho.conf' with the following content:
@@ -50,7 +41,7 @@ path_prefix=/home/jsvnc/jsenv/jsvnc_src
 == Run It ==
 
 {{{
-./mifcho -c /home/jsvnc/jsenv/mifcho.conf -l /home/jsvnc/jsenv/mifcho.log
+~/jsenv/mifcho-0.1/mifcho -c ~/jsenv/mifcho.conf -l ~/jsenv/mifcho.log
 }}}
 
 Navigate your browser: http://your_hostname:8000/jsvnc/vnc.html
