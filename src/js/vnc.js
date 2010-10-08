@@ -21,6 +21,8 @@ function Vnc(o) {
   
   if( o.ws_host == undefined ) o.ws_host = 'mifcho-01';
   if( o.ws_port == undefined ) o.ws_port = '8000';
+  
+  if( o.ws_peerid == undefined ) o.ws_peerid = '';
     
   if( o.agent == undefined ) o.agent = 'ANY'; // Mifcho overlay agent
   
@@ -87,7 +89,7 @@ function Vnc(o) {
   
   // Assign options to vnc-function...
   for (param in o) { self[param] = o[param]; }
-    
+  
   // Wrap around communication library
   self.disconnect = function () {    
     self.ws.close();  
@@ -99,10 +101,10 @@ function Vnc(o) {
 
     if ("WebSocket" in window) {
       self.log('Using Websocket transport.');
-      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port);
+      self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     } else {
       self.log('Using Hobs transport.');
-      self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port);
+      self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     }
     
     self.ws.onopen = function() {
