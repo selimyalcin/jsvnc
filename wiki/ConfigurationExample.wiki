@@ -1,7 +1,6 @@
 #labels installation,setup,configuration
 = Configuring jsVNC with MIFCHO =
 
-jsVNC utilizes MIFCHO as a translator of websockets/hobs to regular RAW sockets.
 This is a configuration-example of installing/configuring jsVNC with MIFCHO for the user 'jsvnc' on a linux machine.
 
 == Do the following ==
