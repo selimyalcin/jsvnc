@@ -76,8 +76,9 @@
           <tr>
             <td>WS Host/Port</td>
             <td>
-            <input id="ws_host" class="host" type="text" name="ws_host" value="mifcho01"/>
-               / <input id="ws_port" type="text" class="port" name="ws_port" value="8000"/>
+                  <input id="ws_host"   class="host" type="text"  name="ws_host"    value="mifcho01"/>
+               /  <input id="ws_port"   type="text"  class="port" name="ws_port"    value="8000"/>
+               /  <input id="ws_peerid" type="text"  class="port" name="ws_peerid"  value="2222"/>
             </td>
           </tr>
         </table>
@@ -112,7 +113,8 @@ $(document).ready(function(){
       vnc_host: $('#vnc_host').val(),
       vnc_port: $('#vnc_port').val(),
       ws_host:  $('#ws_host').val(),
-      ws_port:  $('#ws_port').val()
+      ws_port:  $('#ws_port').val(),
+      ws_peerid: $('#ws_peerid').val()
     });
     
     gui.created = true;
