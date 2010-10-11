@@ -17,7 +17,11 @@ svn export http://jsvnc.googlecode.com/svn/trunk/src/ jsvnc_src
 # Download MIFCHO
 wget "http://mifcho.googlecode.com/svn/trunk/dist/mifcho-0.1.tar.gz"
 tar xzf mifcho-0.1.tar.gz
+
+# Optionally
+
 }}}
+
 
 Create a configuration-file for MIFCHO named 'mifcho.conf' with the following content:
 
