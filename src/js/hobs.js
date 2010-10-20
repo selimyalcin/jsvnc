@@ -212,39 +212,39 @@ function Hobs(url) {
   
   function parseArgs(url) {
         
-    var prefix = '';
-    var peer_id = '';
+    var prefix = '';    
     var ep_host = '';
     var ep_port = 0;
+    var peer_id = '';
     var args = url.path.split('/');
     
     if (args.length == 4) {
+        
+        prefix  = args[1];
       
-      prefix  = args[1];
-
-      ep_host = args[2];
-      ep_port = args[3];
-      
+        ep_host = args[2];
+        ep_port = args[3];
+        
     } else if (args.length == 5) {
-      
-      prefix  = args[1];
-      peer_id = args[2];
-      ep_host = args[3];
-      ep_port = args[4];
-      
+        
+        prefix  = args[1];        
+        ep_host = args[2];
+        ep_port = args[3];
+        peer_id = args[4];
+        
     } else {
-      // something bad happened
+        // something bad happened
     }
     
     return {
-      id:         0,
-      request_id: 0,
-      sending:    0,
-      wait:           50,
-      prefix:         prefix,
-      peer_id:        peer_id,
-      endpoint_host:  ep_host,
-      endpoint_port:  ep_port
+        id:         0,
+        request_id: 0,
+        sending:    0,
+        wait:           50,
+        prefix:         prefix,        
+        endpoint_host:  ep_host,
+        endpoint_port:  ep_port,
+        peer_id:        peer_id
     };
     
   }

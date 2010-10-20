@@ -99,7 +99,8 @@ function Vnc(o) {
     self.state = CONNECTING;
     setTimeout(self.onstatechange, 0, self.state);
 
-    if ("WebSocket" in window) {
+    //if ("WebSocket" in window) {
+    if (false) {
       self.log('Using Websocket transport.');
       self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     } else {
@@ -128,7 +129,7 @@ function Vnc(o) {
       self.buffer += $.base64Decode( event.data );
             
       if (!self.processing) {
-        process_buffer(); 
+        process_buffer();
       }      
 
     }
