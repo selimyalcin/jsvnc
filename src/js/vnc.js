@@ -99,8 +99,8 @@ function Vnc(o) {
     self.state = CONNECTING;
     setTimeout(self.onstatechange, 0, self.state);
 
-    //if ("WebSocket" in window) {
-    if (false) {
+    if ("WebSocket" in window) {
+    //if (false) {
       self.log('Using Websocket transport.');
       self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     } else {
@@ -168,8 +168,11 @@ function Vnc(o) {
     Mouse.x = event.pageX - canvas.offsetLeft;
     Mouse.y = event.pageY - canvas.offsetTop;
     
-    self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
-                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
+    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //));
+    self.ws.send($.base64Encode(
+      self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)                                
     ));
   }
   
@@ -182,8 +185,11 @@ function Vnc(o) {
       Mouse.pressed = true;
     }
     
-    self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
-                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
+    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //));
+    self.ws.send($.base64Encode(
+      self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)                                
     ));
     
   }
@@ -203,8 +209,11 @@ function Vnc(o) {
       pressed = false;
     }
     
-    self.ws.send($.base64Encode(  self.rfb.keyEvent(key_sym, pressed)
-                                + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //self.ws.send($.base64Encode(  self.rfb.keyEvent(key_sym, pressed)
+    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
+    //));
+    self.ws.send($.base64Encode(
+      self.rfb.keyEvent(key_sym, pressed)
     ));
     
   }  
@@ -266,14 +275,10 @@ function Vnc(o) {
       if (poll_count == 0) {
         incremental = 0;
       }
+      
       var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, incremental) );
       self.server_info.bytes_sent += msg.length;
       
-      // prepend the mouse-position
-      if (Mouse.pressed == false) {
-        msg = $.base64Encode( self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button) ) + msg;
-        self.server_info.bytes_sent += msg.length;
-      }      
       self.ws.send( msg );
       
       setTimeout(fbur_poll, FburPoll.frequency, ++poll_count);
@@ -385,7 +390,7 @@ function Vnc(o) {
         for(key in self.server_info) {
           server_info_str += key+':'+self.server_info[key];
         }
-        self.log('Connected to: '+server_info_str+'.');
+        //self.log('Connected to: '+server_info_str+'.');
         
         update_serverinfo();
         
@@ -408,7 +413,11 @@ function Vnc(o) {
         read(1); // eat the padding-byte
         num_r = u16_to_num(read(1), read(1));
         
-        self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
+        // Request another framebuffer update
+        var msg = $.base64Encode( self.rfb.fbur(self.server_info.width, self.server_info.height, 1) );
+        self.server_info.bytes_sent += msg.length;          
+        self.ws.send( msg );
+        //self.log('Incoming rectangles: '+num_r+','+self.buffer.length);
       }
       
       rect = {
@@ -422,12 +431,12 @@ function Vnc(o) {
       // RAW encoding
       if (rect.rect_encoding == 0) {
         
-        self.log('RAW Encoding');
+        //self.log('RAW Encoding');
         var rectangle_length = rect.w*rect.h *(self.server_info.bpp/8);
         if (self.buffer.length >= rectangle_length+12) {
         
           var cur_rect_raw = read(12);
-          self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+rectangle_length+','+self.rfb.enc_map[rect.rect_encoding.toString()]+' '+rect.x+' '+rect.y+' '+rect.w+' '+rect.h);
+          //self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+rectangle_length+','+self.rfb.enc_map[rect.rect_encoding.toString()]+' '+rect.x+' '+rect.y+' '+rect.w+' '+rect.h);
           self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx, self.server_info);
           
           num_r -= 1;       // decrement rectangle count
@@ -435,7 +444,9 @@ function Vnc(o) {
           
           if (num_r == 0) { // no more rectangles
             num_r = -1;
-            msg_type = -1;            
+            msg_type = -1;
+            
+            
           }
           
           // Continue down the rabbit-hole, immediatly, dont wait for more data!
@@ -447,7 +458,7 @@ function Vnc(o) {
         }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        self.log('COPY-RECT');
+        //self.log('COPY-RECT');
         
         if (self.buffer.length >= 12+4) {
           var cur_rect_raw = read(12);
@@ -767,14 +778,14 @@ function Rfb() {
     // and ignore the alpha channel... it could probably be optimized with
     // in-space operations instead calling getImageData...
     
-    self.log('DRAW RECT> Start!');  
+    //self.log('DRAW RECT> Start!');  
     //var r_buffer  = ctx.getImageData(r_x, r_y, w, h);  // Get a rectangle buffer
     var r_buffer  = ctx.createImageData(w, h);  // Get a rectangle buffer
-    self.log('DRAW RECT> Got buffer');  
+    //self.log('DRAW RECT> Got buffer');  
     var alpha_val = 255;
-    self.log('DRAW RECT> set alpha = '+alpha_val);
+    //self.log('DRAW RECT> set alpha = '+alpha_val);
     var bytes_per_pixel = server_info.bpp / 8;
-    self.log('DRAW RECT> set bytes_per_pixel = '+ bytes_per_pixel);
+    //self.log('DRAW RECT> set bytes_per_pixel = '+ bytes_per_pixel);
     
     var crap = '';
     
@@ -815,7 +826,7 @@ function Rfb() {
       
     }
     
-    self.log('Stuffing the buffer'+ crap);    
+    //self.log('Stuffing the buffer'+ crap);    
     ctx.putImageData(r_buffer, r_x, r_y);                 // Draw it
   
   }
