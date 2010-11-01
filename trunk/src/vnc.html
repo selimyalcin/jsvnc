@@ -69,7 +69,12 @@
           <tr>
             <td>VNC Host/Port</td>
             <td>
+              <!--
             <input id="vnc_host" class="host" type="text" name="vnc_host" value="192.168.56.3"/>
+              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900"/>
+            </td>
+            -->
+            <input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost"/>
               / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900"/>
             </td>
           </tr>
@@ -78,7 +83,7 @@
             <td>
                   <input id="ws_host"   class="host" type="text"  name="ws_host"    value="mifcho01"/>
                /  <input id="ws_port"   type="text"  class="port" name="ws_port"    value="8000"/>
-               /  <input id="ws_peerid" type="text"  class="port" name="ws_peerid"  value=""/>
+               /  <input id="ws_peerid" type="text"  class="port" name="ws_peerid"  value="2222"/>
             </td>
           </tr>
         </table>
@@ -96,13 +101,39 @@
 
 $(document).ready(function(){
   
-  var gui = {'scaled': 0,
-              'pinned': 1,
-              'log': function (msg) {
-                document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';  
-              },
-              'created': false
-            };
+  // Load parameters from query-string
+  var named_params  = new Array();  
+  var query         = window.location.search.substring(1);
+  var params        = query.split('&');
+  var immediate_connect = 0;
+  
+  for (var i=0; i<params.length; i++) {
+    var pos = params[i].indexOf('=');
+    
+    if (pos > 0) {
+      var key = params[i].substring(0,pos);
+      var val = params[i].substring(pos+1);
+      named_params[key] = val;
+    }
+  }
+  
+  $('#vnc_host').val(named_params['vnc_host']);
+  $('#vnc_port').val(named_params['vnc_port']);
+  $('#ws_host').val(named_params['ws_host']);
+  $('#ws_port').val(named_params['ws_port']);
+  $('#ws_peerid').val(named_params['ws_peerid']);
+  if (named_params['connect'] == 1) {
+    immediate_connect = 1;
+  }
+  
+  var gui = {
+    'scaled': 0,
+    'pinned': 1,
+    'log': function (msg) {
+      document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';  
+    },
+    'created': false
+  };
   
   var vnc;
   
@@ -179,6 +210,8 @@ $(document).ready(function(){
           $('#frame_container canvas').width(w);
           $('#frame_container canvas').height(h);
           
+          vnc.server_info.scaled = gui['scaled'];
+          
         });
         
       } else if (state == 300) {
@@ -208,6 +241,10 @@ $(document).ready(function(){
     }  
     
   });
+  
+  if (immediate_connect == 1) {
+    $('#connection').trigger('click');
+  }
   
 });
 
