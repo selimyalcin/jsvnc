@@ -156,7 +156,7 @@ function Hobs(url) {
     Session.request_id = generate_rid();
     log(JSON.stringify(Session));
     
-    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/create/'+Session.request_id+'/'+Session.wait+'/'+Session.endpoint_host+'/'+Session.endpoint_port);
+    xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/create/'+Session.request_id+'/'+Session.wait+'/'+Session.endpoint_host+'/'+Session.endpoint_port+'/'+Session.peer_id);
     
     xhr.onreadystatechange = function(event) {
                         
@@ -212,7 +212,7 @@ function Hobs(url) {
   
   function parseArgs(url) {
         
-    var prefix = '';    
+    var prefix  = '';    
     var ep_host = '';
     var ep_port = 0;
     var peer_id = '';

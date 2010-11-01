@@ -101,10 +101,10 @@ function Vnc(o) {
 
     if ("WebSocket" in window) {
     //if (false) {
-      self.log('Using Websocket transport.');
+      self.log('Using Websocket transport.'+'ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
       self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     } else {
-      self.log('Using Hobs transport.');
+      self.log('Using Hobs transport.'+'http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
       self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
     }
     
@@ -168,9 +168,13 @@ function Vnc(o) {
     Mouse.x = event.pageX - canvas.offsetLeft;
     Mouse.y = event.pageY - canvas.offsetTop;
     
-    //self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
-    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
-    //));
+    self.log(Mouse.x+','+Mouse.y);
+    if (self.server_info.scaled == 1) {        
+        Mouse.x = parseInt((self.server_info.width/$('#frame_container canvas').width())*Mouse.x);
+        Mouse.y = parseInt((self.server_info.height/$('#frame_container canvas').height())*Mouse.y)
+        self.log('S'+Mouse.x+','+Mouse.y);
+    }    
+    
     self.ws.send($.base64Encode(
       self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)                                
     ));
@@ -185,9 +189,6 @@ function Vnc(o) {
       Mouse.pressed = true;
     }
     
-    //self.ws.send($.base64Encode(  self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)
-    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
-    //));
     self.ws.send($.base64Encode(
       self.rfb.pointerEvent(Mouse.x, Mouse.y, Mouse.pressed, Mouse.button)                                
     ));
@@ -209,9 +210,6 @@ function Vnc(o) {
       pressed = false;
     }
     
-    //self.ws.send($.base64Encode(  self.rfb.keyEvent(key_sym, pressed)
-    //                            + self.rfb.fbur(self.server_info.width, self.server_info.height, 1)
-    //));
     self.ws.send($.base64Encode(
       self.rfb.keyEvent(key_sym, pressed)
     ));
@@ -441,12 +439,11 @@ function Vnc(o) {
           
           num_r -= 1;       // decrement rectangle count
                             // remove rectangle from buffer
-          
+          //self.log('Rectangles: '+num_r+'.');
           if (num_r == 0) { // no more rectangles
-            num_r = -1;
-            msg_type = -1;
-            
-            
+            num_r       = -1;
+            msg_type    = -1;
+            //self.log('No more rectangles.'+self.buffer.length);
           }
           
           // Continue down the rabbit-hole, immediatly, dont wait for more data!
@@ -458,7 +455,7 @@ function Vnc(o) {
         }
       // CopyRect
       } else if (rect.rect_encoding == 1) {
-        //self.log('COPY-RECT');
+        self.log('COPY-RECT');
         
         if (self.buffer.length >= 12+4) {
           var cur_rect_raw = read(12);
@@ -469,9 +466,11 @@ function Vnc(o) {
           ctx.putImageData(copied_rect, rect.x, rect.y);
           
           num_r -= 1;
+          //self.log('Rectangles: '+num_r+'.');
           if (num_r == 0) { // no more rectangles
-            num_r = -1;
-            msg_type = -1;
+            num_r       = -1;
+            msg_type    = -1;
+            //self.log('No more rectangles.'+self.buffer.length);
           }
           
           // Continue down the rabbit-hole, immediatly, dont wait for more data!
@@ -495,7 +494,7 @@ function Vnc(o) {
         
       // Pseudo-encoding: Cursor
       } else if (rect.rect_encoding == -239) {
-        //self.log('Pseudo-Encoding: Cursor Partially supported Encoding');
+        self.log('Pseudo-Encoding: Cursor Partially supported Encoding');
         
         var cursor_pixels_length = rect.w * rect.h * (self.server_info.bpp / 8);
         var bitmask_length = Math.floor((rect.w + 7) / 8) * rect.h;
@@ -602,6 +601,8 @@ function Vnc(o) {
         }
       }
       
+    } else {
+        //self.log('No matching case, state='+self.state+', msg_type='+msg_type+', buff_l='+self.buffer.length+'.');
     }
     
     self.processing = false;
@@ -788,7 +789,6 @@ function Rfb() {
     //self.log('DRAW RECT> set bytes_per_pixel = '+ bytes_per_pixel);
     
     var crap = '';
-    
     
     for(var i=0; i<(w*h*4);i+=4) {        
       
