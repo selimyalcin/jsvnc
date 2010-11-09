@@ -11,8 +11,6 @@
 </head>
 <body>
 
-<div id="frame_container">
-
   <div id="panel" class="panel">
     <div id="pin"     class="btn icon pin"      title="Controls whether the panel should be visible.">Pin</div>
     <div id="refresh" class="btn icon refresh"  title="Request a full display update.">Refresh</div>
@@ -69,11 +67,6 @@
           <tr>
             <td>VNC Host/Port</td>
             <td>
-              <!--
-            <input id="vnc_host" class="host" type="text" name="vnc_host" value="192.168.56.3"/>
-              / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900"/>
-            </td>
-            -->
             <input id="vnc_host" class="host" type="text" name="vnc_host" value="localhost"/>
               / <input id="vnc_port" type="text" class="port" name="vnc_port" value="5900"/>
             </td>
@@ -95,157 +88,208 @@
     </div>
   </div>
 
-</div>
+<div id="frame_container" />
 
 <script type="text/javascript">
 
 $(document).ready(function(){
   
-  // Load parameters from query-string
-  var named_params  = new Array();  
-  var query         = window.location.search.substring(1);
-  var params        = query.split('&');
-  var immediate_connect = 0;
-  
-  for (var i=0; i<params.length; i++) {
-    var pos = params[i].indexOf('=');
+    // Load parameters from query-string
+    var named_params  = new Array();  
+    var query         = window.location.search.substring(1);
+    var params        = query.split('&');
+    var immediate_connect = 0;
     
-    if (pos > 0) {
-      var key = params[i].substring(0,pos);
-      var val = params[i].substring(pos+1);
-      named_params[key] = val;
-    }
-  }
-  
-  $('#vnc_host').val(named_params['vnc_host']);
-  $('#vnc_port').val(named_params['vnc_port']);
-  $('#ws_host').val(named_params['ws_host']);
-  $('#ws_port').val(named_params['ws_port']);
-  $('#ws_peerid').val(named_params['ws_peerid']);
-  if (named_params['connect'] == 1) {
-    immediate_connect = 1;
-  }
-  
-  var gui = {
-    'scaled': 0,
-    'pinned': 1,
-    'log': function (msg) {
-      document.getElementById("log").innerHTML += (new Date()).toTimeString()+': '+msg+'\n';  
-    },
-    'created': false
-  };
-  
-  var vnc;
-  
-  function bind_vnc() {
-    
-    // Check state, if not connected then do this:
-    vnc = new Vnc({
-      vnc_host: $('#vnc_host').val(),
-      vnc_port: $('#vnc_port').val(),
-      ws_host:  $('#ws_host').val(),
-      ws_port:  $('#ws_port').val(),
-      ws_peerid: $('#ws_peerid').val()
-    });
-    
-    gui.created = true;
-    vnc.connect();
-    vnc.onstatechange = function (state) {
-      
-      if ((state > 0) && (state < 100)) {
-        $('#con_status > span').html('Connecting');
-        $('#con_status').removeClass('disconnected').addClass('connected');
-      } else if ((state >= 100) && (state <200)) {
-        $('#con_status > span').html('Handshaking');
-        $('#con_status').removeClass('disconnected').addClass('connected');
-      } else if ((state >= 200) && (state < 300)) {
-        $('#con_status > span').html('Connected');
-        $('#con_status').removeClass('disconnected').addClass('connected');
+    for (var i=0; i<params.length; i++) {
+        var pos = params[i].indexOf('=');
         
-        /* GUI buttons */
+        if (pos > 0) {
+            var key = params[i].substring(0,pos);
+            var val = params[i].substring(pos+1);
+            named_params[key] = val;
+        }
+    }
     
-        // Pin click
-        $('#pin').click(function (event) {
-  
-          gui['pinned'] = gui['pinned']^1;
-          
-          if ($('#panel').hasClass('unpinned')) {
+    $('#vnc_host').val(named_params['vnc_host']);
+    $('#vnc_port').val(named_params['vnc_port']);
+    $('#ws_host').val(named_params['ws_host']);
+    $('#ws_port').val(named_params['ws_port']);
+    $('#ws_peerid').val(named_params['ws_peerid']);
+    
+    if (named_params['connect'] == 1) {
+        immediate_connect = 1;
+    }
+    
+    var vnc;
+    var gui = {
+        'scaled': 0,
+        'pinned': 1,
+        'log': function (msg) {
+            document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n'+document.getElementById("log").innerHTML;
+        },
+        'created': false,
+        'update_info': function (server_info) {
+            
+            $('#host_status > span').html(server_info.name);
+            $('#hostname').html(server_info.name);
+            $('#fb_res').html(server_info.width+'x'+server_info.height);
+            $('#fb_bpp').html(server_info.bpp);
+            $('#fb_depth').html(server_info.depth);
+            $('#fb_endian').html(server_info.big_endian);
+            $('#fb_truecolor').html(server_info.true_color);
+            $('#fb_rgbmax').html(server_info.red_max+','+server_info.green_max+','+server_info.blue_max);
+            $('#fb_rgbshift').html(server_info.red_shift+','+server_info.green_shift+','+server_info.blue_shift);
+            
+        },
+        'reset_info': function () {
+            $('#host_status > span').html('Unknown');
+            $('#hostname').html('Unknown');
+            $('#fb_res').html('0x0');
+            $('#fb_bpp').html('Unknown');
+            $('#fb_depth').html('Unknown');
+            $('#fb_endian').html('Unknown');
+            $('#fb_truecolor').html('Unknown');
+            $('#fb_rgbmax').html('(,,)');
+            $('#fb_rgbshift').html('(,,)');
+        }
+    };
+    
+    /* GUI buttons */
+    $('#pin').click(function (event) {
+
+        gui['pinned'] = gui['pinned']^1;
+        
+        if ($('#panel').hasClass('unpinned')) {
             $('#panel').removeClass('unpinned');
             $('#panel').removeClass('hidden');
             $('#pin').removeClass('unpin').addClass('pin');
-          } else {
+        } else {
             $('#panel').addClass('unpinned');
             $('#panel').addClass('hidden');
             $('#pin').removeClass('pin').addClass('unpin');
-          }
-          
-        });
+        }
+      
+    });
+    
+    // Refresh click
+    $('#refresh').click(function (event) {
         
-        $('#connection').click(function () { vnc.disconnect(); } );
+        if (vnc && (vnc.state >= 200) && (vnc.state < 300)) {
+            vnc.refresh();    
+        } else {
+            self.log('ERR: Badly timed scaling, probably not connected.')
+        }
         
-        // Refresh click
-        $('#refresh').click(function (event) {    
-          vnc.refresh();
-        });
+    });
+  
+    // Scale click
+    $('#scale').click(function () {        
         
-        // Scale click
-        $('#scale').click(function () {
+        if (vnc && (vnc.state >= 200) && (vnc.state < 300)) {
+            
+            var w = 0;
+            var h = 0;
+                    
+            gui['scaled'] = gui['scaled']^1;        // Toggle scaling
+                    
+            if (gui['scaled'] == 1) {               // Determine width and height
+                w = $(window).width();      
+                h = $(window).height();
+            } else {
+                w = vnc.server_info.width;
+                h = vnc.server_info.height
+            }
+                    
+            $('#frame_container canvas').width(w);  // Perform the actual scaling
+            $('#frame_container canvas').height(h);
+            
+            vnc.server_info.scaled = gui['scaled'];
+            
+        } else {
+            self.log('ERR: Badly timed scaling, probably not connected.')
+        }
+      
+    });
+    
+    $('#connection').click(function () {
+        
+        if (vnc) {
+            gui.created=false;
+            vnc.disconnect();
+            vnc = null;
+            
+        } else {            
+            bind_vnc();          
+        }  
+      
+    });
+    
+    function bind_vnc() {
+        
+        vnc = new Vnc({
+            vnc_host: $('#vnc_host').val(),
+            vnc_port: $('#vnc_port').val(),
+            ws_host:  $('#ws_host').val(),
+            ws_port:  $('#ws_port').val(),
+            ws_peerid: $('#ws_peerid').val()
+        });        
+        
+        vnc.onstatechange = function (state) {
+            
+            if (state == 0) {
                 
-          var w = 0;
-          var h = 0;
-          
-          // Toggle scaling
-          gui['scaled'] = gui['scaled']^1;
-          
-          // Determine width and height
-          if (gui['scaled'] == 1) {
-            w = $(window).width();      
-            h = $(window).height();
-          } else {
-            w = vnc.server_info.width;
-            h = vnc.server_info.height
-          }
-          
-          // Do scaling
-          $('#frame_container canvas').width(w);
-          $('#frame_container canvas').height(h);
-          
-          vnc.server_info.scaled = gui['scaled'];
-          
-        });
+                gui.log('Connecting...'+state);
+                $('#con_status > span').html('Connecting');
+                $('#con_status').removeClass('disconnected').addClass('connected');
+                $('#connection').html('Abort');
+                
+            } else if ((state > 0) && (state < 100)) {
+                
+                gui.log('Connecting...'+state);
+                $('#con_status > span').html('Connecting');
+                $('#con_status').removeClass('disconnected').addClass('connected');
+                $('#connection').html('Abort');
+                
+            } else if ((state >= 100) && (state <200)) {
+                
+                gui.log('Handshaking...'+state);
+                $('#con_status > span').html('Handshaking');
+                $('#con_status').removeClass('disconnected').addClass('connected');
+                $('#connection').html('Abort');
+                
+            } else if ((state >= 200) && (state < 300)) {
+                
+                gui.log('Connected.'+state);
+                $('#con_status > span').html('Connected');
+                $('#con_status').removeClass('disconnected').addClass('connected');
+                $('#connection').html('Disconnect');
+                
+                gui.update_info(vnc.server_info);
         
-      } else if (state == 300) {
-        $('#con_status > span').html('Disconnected');
-        $('#con_status').removeClass('connected').addClass('disconnected');
+            } else if (state == 300) {
+                gui.log('Disconnected.'+state);
+                $('#con_status > span').html('Disconnected');
+                $('#con_status').removeClass('connected').addClass('disconnected');
+                $('#connection').html('Connect');
+                
+                gui.reset_info();
+              
+            } else {
+                
+                gui.log('ERROR UNKNOWN STATE! '+state);
+                $('#con_status > span').html('Unknown');
+            }
+            
+        }
         
-      } else {
-        $('#con_status > span').html('Unknown');
-      }
+        vnc.connect();
       
     }
-    
-  }
-  
-  $('#connection').click(function () {
-    
-    if (gui.created) {
-      
-      gui.created=false;
-      vnc.disconnect();
-      bind_vnc();
-      
-    } else {
-  
-      bind_vnc();
-      
-    }  
-    
-  });
-  
-  if (immediate_connect == 1) {
-    $('#connection').trigger('click');
-  }
-  
+
+    if (immediate_connect == 1) {
+        $('#connection').trigger('click');
+    }
+
 });
 
 </script>
