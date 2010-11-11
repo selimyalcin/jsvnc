@@ -288,7 +288,7 @@ function Vnc(o) {
             var msg = $.base64Encode('RFB 003.008\n');
             self.ws.send( msg );
             self.server_info.bytes_sent += msg.length;
-            
+            self.log('RFB VER'+rfb_ver);
             self.state = HANDSHAKE_SEC;
             setTimeout(self.onstatechange, 0, self.state);
           
@@ -300,9 +300,11 @@ function Vnc(o) {
                 for(var i=1; i<=num_sec; i++) {
                     sec_types.push( u8_to_num(read(1)) );
                 }
+                self.log('Sectypes'+ num_sec);
             } else {
-              // Connection failed
-              // TODO: handle a failed connection attempt!
+                // Connection failed
+                // TODO: handle a failed connection attempt!
+                self.log('Something went wrong... in handshake security');
             }
         
             self.ws.send( $.base64Encode( num_to_u8(1)) ); // Select sec-type None
@@ -315,8 +317,10 @@ function Vnc(o) {
           
             var sec_res = u32_to_num(read(1), read(1), read(1), read(1));
         
+            self.log('Sec_res '+ sec_res);
             if (sec_res == 1) { // security response = failed
-                // TODO: Handle a failed security response        
+                // TODO: Handle a failed security response
+                self.log('Something went wrong... in handshake security RESULT.');
             }
             
             self.ws.send( $.base64Encode( num_to_u8(0) )); // Send client-init
