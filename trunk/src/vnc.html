@@ -120,12 +120,23 @@ $(document).ready(function(){
         immediate_connect = 1;
     }
     
+    var n = 0;
+    var ns = 5;
+    var nodes = new Array(        
+        {'host': 'mifcho01', 'port': '8001'},
+        {'host': 'mifcho02', 'port': '8002'},
+        {'host': 'mifcho03', 'port': '8003'},
+        {'host': 'mifcho04', 'port': '8004'},
+        {'host': 'mifcho05', 'port': '8005'}
+    );
+    
     var vnc;
     var gui = {
         'scaled': 0,
         'pinned': 1,
         'log': function (msg) {
-            document.getElementById("log").innerHTML = (new Date()).toTimeString()+': '+msg+'\n'+document.getElementById("log").innerHTML;
+            var date = new Date();
+            document.getElementById("log").innerHTML = 'G '+date.getHours()+':'+date.getMinutes()+':'+date.getSeconds()+','+date.getMilliseconds()+': '+msg+'\n' +document.getElementById("log").innerHTML;        
         },
         'created': false,
         'update_info': function (server_info) {
@@ -139,7 +150,7 @@ $(document).ready(function(){
             $('#fb_truecolor').html(server_info.true_color);
             $('#fb_rgbmax').html(server_info.red_max+','+server_info.green_max+','+server_info.blue_max);
             $('#fb_rgbshift').html(server_info.red_shift+','+server_info.green_shift+','+server_info.blue_shift);
-            
+        
         },
         'reset_info': function () {
             $('#host_status > span').html('Unknown');
@@ -210,16 +221,22 @@ $(document).ready(function(){
         }
       
     });
-    
+                
     $('#connection').click(function () {
         
-        if (vnc) {
-            gui.created=false;
+        if (vnc && (vnc.state >= 0) && (vnc.state < 300)) {
+            gui.log("DIS while connected!!!");
             vnc.disconnect();
             vnc = null;
             
-        } else {            
-            bind_vnc();          
+        } else if (vnc && (vnc.state == 300)) {
+            gui.log("DIS while DISconnected?");
+            vnc = null;
+            bind_vnc();
+        } else {
+            gui.log("Connecting...");
+            vnc = null;
+            bind_vnc();
         }  
       
     });
@@ -229,37 +246,37 @@ $(document).ready(function(){
         vnc = new Vnc({
             vnc_host: $('#vnc_host').val(),
             vnc_port: $('#vnc_port').val(),
-            ws_host:  $('#ws_host').val(),
-            ws_port:  $('#ws_port').val(),
+            ws_host:  nodes[n%ns].host,
+            ws_port:  nodes[n%ns].port,
             ws_peerid: $('#ws_peerid').val()
-        });        
+        });  
         
         vnc.onstatechange = function (state) {
             
             if (state == 0) {
                 
-                gui.log('Connecting...'+state);
+                gui.log('Connecting...'+state+' '+nodes[n%ns].host+':'+nodes[n%ns].port);
                 $('#con_status > span').html('Connecting');
                 $('#con_status').removeClass('disconnected').addClass('connected');
                 $('#connection').html('Abort');
                 
             } else if ((state > 0) && (state < 100)) {
                 
-                gui.log('Connecting...'+state);
+                gui.log('Connecting...'+state+' '+nodes[n%ns].host+':'+nodes[n%ns].port);
                 $('#con_status > span').html('Connecting');
                 $('#con_status').removeClass('disconnected').addClass('connected');
                 $('#connection').html('Abort');
                 
             } else if ((state >= 100) && (state <200)) {
                 
-                gui.log('Handshaking...'+state);
+                gui.log('Handshaking...'+state+' '+nodes[n%ns].host+':'+nodes[n%ns].port);
                 $('#con_status > span').html('Handshaking');
                 $('#con_status').removeClass('disconnected').addClass('connected');
                 $('#connection').html('Abort');
                 
             } else if ((state >= 200) && (state < 300)) {
                 
-                gui.log('Connected.'+state);
+                gui.log('Connected.'+state+' '+nodes[n%ns].host+':'+nodes[n%ns].port);
                 $('#con_status > span').html('Connected');
                 $('#con_status').removeClass('disconnected').addClass('connected');
                 $('#connection').html('Disconnect');
@@ -267,12 +284,21 @@ $(document).ready(function(){
                 gui.update_info(vnc.server_info);
         
             } else if (state == 300) {
-                gui.log('Disconnected.'+state);
+                gui.log('Disconnected.'+state+' '+nodes[n%ns].host+':'+nodes[n%ns].port);
                 $('#con_status > span').html('Disconnected');
                 $('#con_status').removeClass('connected').addClass('disconnected');
                 $('#connection').html('Connect');
                 
                 gui.reset_info();
+                
+                gui.log('Retrying in 5 seconds...')
+                setTimeout(function () {
+                    gui.log('Retrying now!')
+                    $('#connection').trigger('click');
+                },
+                1000    // VNC SERVER IS TOO SLOW!
+                        // SHOULD HANDLE THE INCORRECT SETUP OF A NEW CONNECTION!
+                );
               
             } else {
                 
@@ -283,6 +309,7 @@ $(document).ready(function(){
         }
         
         vnc.connect();
+        n = n + 1;
       
     }
 
