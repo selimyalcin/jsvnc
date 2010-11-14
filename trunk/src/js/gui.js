@@ -34,7 +34,7 @@
     
  
 */
-function VNCGui() {
+function VNCGui(nodes) {
     
     var default_info = {
         width:      800,    height:       600,  bpp:        0,
@@ -88,8 +88,6 @@ function VNCGui() {
         $('#connection').html(button_text);
         vnc.overlay_text(overlay_text);
     }
-    
-    
     
     self.pin = function () {
         
@@ -171,7 +169,8 @@ function VNCGui() {
             vnc_port: $('#vnc_port').val(),
             ws_host:  $('#ws_host').val(),
             ws_port:  $('#ws_port').val(),
-            ws_peerid: $('#ws_peerid').val()
+            ws_peerid: $('#ws_peerid').val(),
+            nodes: nodes
         });  
         
         vnc.onstatechange = function (state) {
