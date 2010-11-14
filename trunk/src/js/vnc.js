@@ -26,12 +26,12 @@ function Vnc(o) {
     
     if( o.ws_peerid == undefined ) o.ws_peerid = '';
       
-    if( o.agent == undefined ) o.agent = 'ANY'; // Mifcho overlay agent
+    if( o.agent == undefined ) o.agent = 'ANY';
     
     // GUI bindings
     if( o.log == undefined ) o.log = function (msg) {
         var date = new Date();
-        document.getElementById("log").innerHTML = date.getHours()+':'+date.getMinutes()+':'+date.getSeconds()+','+date.getMilliseconds()+': '+msg+'\n' +document.getElementById("log").innerHTML;
+        document.getElementById("log").innerHTML = date.getHours()+':'+date.getMinutes()+':'+date.getSeconds()+','+date.getMilliseconds()+' LIB - '+msg+'\n' +document.getElementById("log").innerHTML;
     }
     if (o.ctx_id == undefined ) o.ctx_id = 'vnc_canvas';
     if (o.fc_id == undefined ) o.fc_id = 'frame_container';
@@ -75,9 +75,6 @@ function Vnc(o) {
       
     }
     
-    var ctx;            // Initialized during handshake
-    var canvas;         // Initialized during handshake
-    
     var msg_type = -1;
     var num_r = -1;
     var cur_r = 0;
@@ -85,10 +82,11 @@ function Vnc(o) {
     
     var Mouse = { x:0, y:0, pressed:false, button:0  };
     
-    //var FburPoll = {frequency: 1000, polling:false };
-    
     self.buffer       = '';
     self.processing   = false;
+    
+    self.ctx    = null;
+    self.canvas = null;
     
     // Assign options to vnc-function...
     for (param in o) { self[param] = o[param]; }
@@ -102,11 +100,10 @@ function Vnc(o) {
     self.connect    = function () {
         
         self.state = CONNECTING;
-        overlay_text('CONNECTING...');
         setTimeout(self.onstatechange, 0, self.state);
         
-        if ("WebSocket" in window) {
-            //if (false) {
+        //if ("WebSocket" in window) {
+        if (false) {
             self.log('Using Websocket transport.'+'ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
             self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
         } else {
@@ -114,15 +111,15 @@ function Vnc(o) {
             self.ws = new Hobs('http://'+self.ws_host+':'+self.ws_port+'/hobs/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
         }
         
+        self.log('waiting on websocket');
+        
         self.ws.onopen = function() {
             self.state = HANDSHAKE;
-            overlay_text('HANDSHAKING...');
             setTimeout(self.onstatechange, 0, self.state);
         };
         
         self.ws.onclose = function() {
             self.state = DISCONNECTED;
-            overlay_text('DISCONNECTED');            
             setTimeout(self.onstatechange, 0, self.state);
         };
         
@@ -146,29 +143,26 @@ function Vnc(o) {
     function init_canvas(width, height) {
     
         self.log('Attempting to init canvas '+width+' '+height);
-                
-        if ($('#'+self.ctx_id).length > 0) {    // Remove existing canvas
-            $('#'+self.ctx_id).remove();
-        }
         
-        document.getElementById(self.fc_id).innerHTML += '<canvas id="'+self.ctx_id+'" width="'+width+'" height="'+height+'"></canvas>';
-        canvas  = document.getElementById(self.ctx_id);
-        ctx     = document.getElementById(self.ctx_id).getContext('2d');
-        ctx.fillStyle = 'rgb(0, 75, 225)';
-      
-        ctx.fillRect(0,0, width, height);
+        self.canvas         = document.getElementById(self.ctx_id);
+        self.canvas.width   = width;
+        self.canvas.height  = height;
+        self.ctx            = document.getElementById(self.ctx_id).getContext('2d');
+        
+        self.ctx.fillStyle = 'rgb(0, 75, 225)';      
+        self.ctx.fillRect(0,0, width, height);
     
     }
     
-    init_canvas(800, 600);
+    //init_canvas(800, 600);
     
     function init_input () {    // Register event-handlers
     
                                 // Mouse-events
-        canvas.oncontextmenu    = function () { return false; }
-        canvas.onmousedown      = function (event) { mouse_click_handler(event); };
-        canvas.onmouseup        = function (event) { mouse_click_handler(event); };
-        canvas.onmousemove      = function (event) { mouse_move_handler(event); };
+        self.canvas.oncontextmenu    = function () { return false; }
+        self.canvas.onmousedown      = function (event) { mouse_click_handler(event); };
+        self.canvas.onmouseup        = function (event) { mouse_click_handler(event); };
+        self.canvas.onmousemove      = function (event) { mouse_move_handler(event); };
         
                                 // Keyboard events
         window.onkeydown    = function (event) { key_handler(event); };
@@ -179,8 +173,8 @@ function Vnc(o) {
     // Handle mouse movement by sending pointerEvent
     function mouse_move_handler(event) {
         
-        Mouse.x = event.pageX - canvas.offsetLeft;
-        Mouse.y = event.pageY - canvas.offsetTop;
+        Mouse.x = event.pageX - self.canvas.offsetLeft;
+        Mouse.y = event.pageY - self.canvas.offsetTop;
         
         if (self.server_info.scaled == 1) {
             Mouse.x = parseInt((self.server_info.width/$('#frame_container canvas').width())*Mouse.x);
@@ -228,30 +222,7 @@ function Vnc(o) {
         ));
       
     }  
-    
-    // Helper function, writes "text" centered on the canvas.
-    function overlay_text(text) {
-      
-        ctx.shadowOffsetX   = 2;
-        ctx.shadowOffsetY   = 2;
-        ctx.shadowBlur      = 2;
-        ctx.shadowColor     = "rgba(0, 0, 0, 0.5)";
-       
-        ctx.font      = "36px Verdana";
-        ctx.fillStyle = "Black";
         
-        var txt_dim = ctx.measureText(text);
-        
-        var x = Math.floor((self.server_info.width - txt_dim.width)/2);
-        var y = Math.floor(self.server_info.height/2)
-         
-        ctx.fillStyle = 'rgb(0, 50, 150)';
-        ctx.fillRect (x-20, y-50, txt_dim.width+40, 80);
-        
-        ctx.fillStyle = 'Black';
-        ctx.fillText(text, x, y);
-    }
-    
     // It will attempt to read "size" bytes from the input-buffer,
     // if the buffer does not have a "size" bytes available
     // empty string is returned.
@@ -358,7 +329,6 @@ function Vnc(o) {
                 self.server_info.name = read(name_len);
                 
                 // Initialize the canvas context
-                //$('#'+self.ctx_id).remove();    // Remove any existing canvas
                 init_canvas(self.server_info.width, self.server_info.height);
                 init_input();
                 
@@ -383,8 +353,6 @@ function Vnc(o) {
                 ));
                 self.server_info.bytes_sent += msg.length;
                 self.ws.send( msg );
-          
-                overlay_text("Initializing display...");
                 
                 self.state = CONNECTED;
                 
@@ -436,7 +404,7 @@ function Vnc(o) {
                 
                     var cur_rect_raw = read(12);
                     //self.log('FBUR Draw: '+num_r+','+self.buffer.length+','+rectangle_length+','+self.rfb.enc_map[rect.rect_encoding.toString()]+' '+rect.x+' '+rect.y+' '+rect.w+' '+rect.h);
-                    self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), ctx, self.server_info);
+                    self.rfb.draw_rectangle(rect.x, rect.y, rect.w, rect.h, read(rectangle_length), self.ctx, self.server_info);
                     
                     num_r -= 1;       // decrement rectangle count
                                       // remove rectangle from buffer
@@ -463,8 +431,8 @@ function Vnc(o) {
                     var src_x = u16_to_num(read(1), read(1));
                     var src_y = u16_to_num(read(1), read(1));
                     
-                    var copied_rect = ctx.getImageData(src_x, src_y, rect.w, rect.h);  // Get a rectangle buffer
-                    ctx.putImageData(copied_rect, rect.x, rect.y);
+                    var copied_rect = self.ctx.getImageData(src_x, src_y, rect.w, rect.h);  // Get a rectangle buffer
+                    self.ctx.putImageData(copied_rect, rect.x, rect.y);
                     
                     num_r -= 1;
                     //self.log('Rectangles: '+num_r+'.');
@@ -506,7 +474,7 @@ function Vnc(o) {
                     
                     // The cursor bitmap is currenly unused.
                     var cursor_pixels_raw = read(cursor_pixels_length);
-                    var cursor_image_data = ctx.createImageData(rect.h, rect.w);          
+                    var cursor_image_data = self.ctx.createImageData(rect.h, rect.w);          
                     var bitmask_scanlines = read(bitmask_length);          
                     for(var i=0; i<cursor_pixels_raw.length; i++) {
                         cursor_image_data[i] = u8_to_num(cursor_pixels_raw[i]);
@@ -620,6 +588,34 @@ function Vnc(o) {
         self.ws.send( msg );
         self.server_info.bytes_sent += msg.length;
     }
+    
+    self.overlay_text = function (text) {
+        
+        var min_width = 350;
+        
+        var text_width = self.ctx.measureText(text).width;
+        if (text_width < min_width) {
+            text_width = min_width;
+        }
+
+        var x = Math.floor((self.server_info.width - text_width)/2);
+        var y = Math.floor(self.server_info.height/2)
+        
+        self.ctx.shadowOffsetX   = 2;
+        self.ctx.shadowOffsetY   = 2;
+        self.ctx.shadowBlur      = 2;
+        self.ctx.shadowColor     = "rgba(0, 0, 0, 0.5)";
+        self.ctx.font            = "36px Verdana";
+        
+        self.ctx.fillStyle = 'rgb(0, 50, 150)';
+        self.ctx.fillRect (x-20, y-50, text_width, 80);
+       
+        self.ctx.fillStyle = 'Black';
+        self.ctx.fillText(text, x, y);
+        
+    }
+    
+    init_canvas(self.server_info.width, self.server_info.height);
 
 }
 

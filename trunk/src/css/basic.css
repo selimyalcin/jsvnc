@@ -178,8 +178,6 @@ input.port {
     margin:auto;
 }
 
-#host_information div { display: block; }
-#host_information div > div { display: block; }
 #log { width: 1024px; overflow: scroll; }
 
 /* Welcome stuff */
