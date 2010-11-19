@@ -133,7 +133,7 @@ $(document).ready(function(){
     var nodes = new Array();
     (function () {
         var e,
-            r = /([a-z0-9]+):([0-9]+)/ig,
+            r = /([a-z\.0-9]+):([0-9]+)/ig,
             q = urlParams['mifcho'] ? urlParams['mifcho'] : '';
         
         while (e = r.exec(q))

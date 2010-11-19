@@ -102,8 +102,8 @@ function Vnc(o) {
         self.state = CONNECTING;
         setTimeout(self.onstatechange, 0, self.state);
         
-        //if ("WebSocket" in window) {
-        if (false) {
+        if ("WebSocket" in window) {
+        //if (false) {
             self.log('Using Websocket transport.'+'ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
             self.ws = new WebSocket('ws://'+self.ws_host+':'+self.ws_port+'/wsocket/'+self.vnc_host+'/'+self.vnc_port+'/'+self.ws_peerid);
         } else {
