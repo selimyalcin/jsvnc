@@ -78,7 +78,7 @@ function FMVnc(o) {
                 reconnection_attempts = attempt_reconnect + 1;
                 n = n + 1;
                 wrap_vnc();
-                setTimeout(vnc.connect, 1000);
+                setTimeout(vnc.connect, 2000);
             } else {
                 setTimeout(self.onstatechange, 0, state);
             }
