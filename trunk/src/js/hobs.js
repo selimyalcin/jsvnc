@@ -23,11 +23,6 @@ function u8_to_num(w)               { return w.charCodeAt(0); };
 function u16_to_num(w1, w2)         { return (w1.charCodeAt(0)<<8)  + w2.charCodeAt(0); };
 function u32_to_num(w1, w2, w3, w4) { return (w1.charCodeAt(0)<<24) + (w2.charCodeAt(0)<<16)+(w3.charCodeAt(0)<<8)+w4.charCodeAt(0); }
 
-// Basic logger
-function log(msg) {
-  $('#log').append(msg);
-}
-
 // parseUri 1.2.2
 // (c) Steven Levithan <stevenlevithan.com>
 // MIT License
@@ -154,7 +149,6 @@ function Hobs(url) {
     
     // Create the request-identifier offset
     Session.request_id = generate_rid();
-    log(JSON.stringify(Session));
     
     xhr.open('GET', self.url.protocol+'://'+self.url.host+':'+self.url.port+'/'+Session.prefix+'/create/'+Session.request_id+'/'+Session.wait+'/'+Session.endpoint_host+'/'+Session.endpoint_port+'/'+Session.peer_id);
     
