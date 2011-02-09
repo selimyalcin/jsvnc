@@ -107,7 +107,7 @@ function VNCGui(nodes) {
     
     self.scale = function () {
         
-        if (vnc && (vnc.state >= 200) && (vnc.state < 300)) {
+        if (vnc) {
             
             var w = 0;
             var h = 0;
